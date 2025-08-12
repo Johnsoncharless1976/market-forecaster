@@ -1,5 +1,32 @@
-image: alpine:3.20
-stages: [test]
-smoke:
+image: python:3.11
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+before_script:
+  - python -m pip install --upgrade pip
+  - pip install -r requirements.txt
+
+stages:
+  - test
+  - ingest
+
+pytest:
   stage: test
-  script: ["echo CI OK"]
+  rules:
+    - if: '\ == "schedule"'
+      when: never
+    - when: on_success
+  script:
+    - pip install pytest
+    - pytest -q
+
+ingest_yesterday:
+  stage: ingest
+  rules:
+    - if: '\ == "schedule"'
+      when: on_success
+    - when: never
+  script:
+    - python src/data_ingestion.py
