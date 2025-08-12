@@ -4,13 +4,14 @@ variables:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
   PYTHONDONTWRITEBYTECODE: "1"
 
-before_script:
-  - python -m pip install --upgrade pip
-  - pip install -r requirements.txt
-
 stages:
+  - preflight
   - test
   - ingest
+
+before_script:
+  - python -m pip install --upgrade pip
+  - pip install --no-cache-dir -r requirements.txt
 
 pytest:
   stage: test
@@ -23,8 +24,29 @@ pytest:
     - pip install pytest
     - pytest -q
 
+preflight_polygon:
+  stage: preflight
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: on_success
+    - when: never
+  script:
+    - python - << 'PY'
+import os, requests, sys
+k = os.getenv("POLYGON_API_KEY")
+print("POLYGON_API_KEY present:", bool(k), "len:", (len(k) if k else None), "prefix:", ((k[:6]+"") if k else None))
+if not k:
+    sys.exit("Missing POLYGON_API_KEY (check Project  Settings  CI/CD  Variables. If the var is Protected, protect the branch or unprotect the var).")
+r = requests.get("https://api.polygon.io/v3/reference/tickers?limit=1&apiKey="+k, timeout=20)
+print("Polygon /v3/reference/tickers status:", r.status_code)
+if not r.ok:
+    print("Body:", r.text[:200])
+    sys.exit("Polygon rejected the key. Update POLYGON_API_KEY in CI/CD Variables.")
+PY
+
 ingest_yesterday:
   stage: ingest
+  needs: ["preflight_polygon"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
