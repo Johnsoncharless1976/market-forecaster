@@ -15,9 +15,10 @@ stages:
 pytest:
   stage: test
   rules:
-    - if: '\ == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: never
-    - when: on_success
+    - if: '$CI_PIPELINE_SOURCE != "schedule"'
+      when: on_success
   script:
     - pip install pytest
     - pytest -q
@@ -25,7 +26,7 @@ pytest:
 ingest_yesterday:
   stage: ingest
   rules:
-    - if: '\ == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
       when: on_success
     - when: never
   script:
