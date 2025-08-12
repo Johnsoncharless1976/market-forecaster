@@ -1,8 +1,6 @@
 image: python:3.11
 
-stages:
-  - test
-  - ingest
+stages: [preflight, ingest]
 
 variables:
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
@@ -12,20 +10,15 @@ before_script:
   - python -m pip install --upgrade pip
   - pip install -r requirements.txt
 
-# Runs on pushes/MRs (NOT on schedules)
-pytest:
-  stage: test
-  except:
-    - schedules
+preflight:
+  stage: preflight
+  only: [schedules]
   script:
-    - python -c "print('pytest placeholder - add real tests later')"
+    - python ci/preflight.py
 
-# Runs ONLY when triggered by a schedule
 ingest_yesterday:
   stage: ingest
-  only:
-    - schedules
+  only: [schedules]
+  needs: [preflight]
   script:
-    - python -c "import os; print('Key present:', bool(os.getenv('POLYGON_API_KEY')))"
-    - python src/data_ingestion.py
-
+    - python ci/run_ingest.py
