@@ -1,0 +1,5 @@
+image: alpine:3.20
+stages: [test]
+smoke:
+  stage: test
+  script: ["echo CI OK"]
