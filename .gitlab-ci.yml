@@ -3,8 +3,8 @@ image: python:3.11
 stages: [preflight, ingest]
 
 variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+  PYTHONDONTWRITEBYTECODE: '1'
 
 before_script:
   - python -m pip install --upgrade pip
