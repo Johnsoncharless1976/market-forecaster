@@ -22,3 +22,22 @@ ingest_yesterday:
   needs: [preflight]
   script:
     - python ci/run_ingest.py
+  artifacts:
+    when: always
+    paths:
+      - out/*.csv
+    expire_in: 14 days
+
+# Manual trigger for ad-hoc runs (NOT on schedules)
+ingest_manual:
+  stage: ingest
+  except: [schedules]
+  when: manual
+  allow_failure: false
+  script:
+    - python ci/run_ingest.py
+  artifacts:
+    when: always
+    paths:
+      - out/*.csv
+    expire_in: 14 days
