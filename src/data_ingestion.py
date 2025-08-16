@@ -88,6 +88,6 @@ def save_results_to_csv(results, out_dir="out"):
 
 
 if __name__ == "__main__":
-    tickers = ["SPY", "QQQ", "I:SPX"]  # adjust as needed
+    tickers = ["SPY", "QQQ"]  # adjust as needed
     results = fetch_previous_day_bars(tickers)
     save_results_to_csv(results)
