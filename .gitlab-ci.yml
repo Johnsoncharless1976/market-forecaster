@@ -1,43 +1,16 @@
-image: python:3.11
+stages:
+  - ingest
 
-stages: [preflight, ingest]
-
-variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: '1'
-  PYTHONDONTWRITEBYTECODE: '1'
-
-before_script:
-  - python -m pip install --upgrade pip
-  - pip install -r requirements.txt
-
-preflight:
-  stage: preflight
-  only: [schedules]
-  script:
-    - python ci/preflight.py
-
-ingest_yesterday:
+ingest_job:
   stage: ingest
-  only: [schedules]
-  needs: [preflight]
+  image: python:3.11   # or match your local version
+  before_script:
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
   script:
-    - python ci/run_ingest.py
+    - python -m src.data_ingestion   # run from project root
   artifacts:
     when: always
     paths:
       - out/*.csv
-    expire_in: 14 days
-
-# Manual trigger for ad-hoc runs (NOT on schedules)
-ingest_manual:
-  stage: ingest
-  except: [schedules]
-  when: manual
-  allow_failure: false
-  script:
-    - python ci/run_ingest.py
-  artifacts:
-    when: always
-    paths:
-      - out/*.csv
-    expire_in: 14 days
+    expire_in: 1 week
