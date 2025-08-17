@@ -1,7 +1,14 @@
+# GitLab CI/CD Pipeline
+# Stages:
+#   1. ingest → pulls market data daily into Snowflake
+#   2. verify → checks that the latest rows are in place
 stages:
   - ingest
+  - verify
 
-# SPY ingestion from Polygon
+# ----------------------
+# SPY ingestion (Polygon)
+# ----------------------
 spy_to_snowflake:
   stage: ingest
   image: python:3.13
@@ -10,7 +17,9 @@ spy_to_snowflake:
   script:
     - python src/data_ingestion.py
 
-# VIX + VVIX ingestion from CBOE
+# ------------------------
+# VIX + VVIX ingestion (CBOE)
+# ------------------------
 vix_vvix_to_snowflake:
   stage: ingest
   image: python:3.13
@@ -18,3 +27,29 @@ vix_vvix_to_snowflake:
     - pip install --no-cache-dir snowflake-connector-python requests
   script:
     - python src/data_ingestion_vix.py
+
+# ------------------------
+# ES (E-mini Futures) ingestion (Yahoo Finance)
+# ------------------------
+es_to_snowflake:
+  stage: ingest
+  image: python:3.13
+  before_script:
+    - pip install --no-cache-dir snowflake-connector-python yfinance
+  script:
+    - python src/data_ingestion_es.py
+
+# ------------------------
+# Verification job
+# ------------------------
+verify_ingestion:
+  stage: verify
+  image: python:3.13
+  needs:
+    - spy_to_snowflake
+    - vix_vvix_to_snowflake
+    - es_to_snowflake
+  before_script:
+    - pip install --no-cache-dir snowflake-connector-python
+  script:
+    - python src/verify_ingestion.py
