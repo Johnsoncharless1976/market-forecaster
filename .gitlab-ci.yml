@@ -1,16 +1,10 @@
 stages:
   - ingest
 
-ingest_job:
+spy_to_snowflake:
   stage: ingest
-  image: python:3.11   # or match your local version
+  image: python:3.13
   before_script:
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install snowflake-connector-python requests
   script:
-    - python -m src.data_ingestion   # run from project root
-  artifacts:
-    when: always
-    paths:
-      - out/*.csv
-    expire_in: 1 week
+    - python src/data_ingestion.py
