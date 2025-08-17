@@ -1,10 +1,20 @@
 stages:
   - ingest
 
+# SPY ingestion from Polygon
 spy_to_snowflake:
   stage: ingest
   image: python:3.13
   before_script:
-    - pip install snowflake-connector-python requests
+    - pip install --no-cache-dir snowflake-connector-python requests
   script:
     - python src/data_ingestion.py
+
+# VIX + VVIX ingestion from CBOE
+vix_vvix_to_snowflake:
+  stage: ingest
+  image: python:3.13
+  before_script:
+    - pip install --no-cache-dir snowflake-connector-python requests
+  script:
+    - python src/data_ingestion_vix.py
