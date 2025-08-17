@@ -53,3 +53,8 @@ verify_ingestion:
     - pip install --no-cache-dir snowflake-connector-python
   script:
     - python src/verify_ingestion.py
+stage3_snapshot:
+  stage: analyze
+  script:
+    - python src/stage3_snapshot.py
+  needs: ["verify_ingestion"]
