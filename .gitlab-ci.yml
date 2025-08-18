@@ -5,6 +5,7 @@
 stages:
   - ingest
   - verify
+  - analyze
 
 # ----------------------
 # SPY ingestion (Polygon)
@@ -53,6 +54,7 @@ verify_ingestion:
     - pip install --no-cache-dir snowflake-connector-python
   script:
     - python src/verify_ingestion.py
+    
 stage3_snapshot:
   stage: analyze
   script:
