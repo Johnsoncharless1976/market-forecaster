@@ -1,41 +1,69 @@
-image: python:3.11-slim
-
-cache:
-  key: pip-cache
-  paths:
-    - .cache/pip
-
-before_script:
-  - python --version
-  - pip install --upgrade pip
-  - pip install --cache-dir=.cache/pip pandas snowflake-connector-python yfinance
+# .gitlab-ci.yml
 
 stages:
-  - ingest
-  - snapshot
+  - test
   - forecast
-  - maintenance
+  - deploy
 
-ingest:
-  stage: ingest
+# -----------------------
+# Stage 1: Tests (example)
+# -----------------------
+unit_tests:
+  stage: test
+  image: python:3.11-slim
   script:
-    - python src/Spy_BackFill.py
-    - python src/ES_BackFill.py
+    - pip install -r requirements.txt
+    - pytest -v
+  artifacts:
+    when: always
+    paths:
+      - tests/reports/
+    expire_in: 7 days
 
-snapshot:
-  stage: snapshot
-  script:
-    - python src/stage3_snapshot.py
-
-forecast:
+# -----------------------
+# Stage 4 Forecast Job
+# -----------------------
+stage4_forecast:
   stage: forecast
+  image: python:3.11-slim
+  before_script:
+    - pip install -r requirements.txt
   script:
     - python src/stage4_forecast.py
+    - |
+      python - <<'EOF'
+      import smtplib, os
+      from email.mime.text import MIMEText
 
-# 🧹 Weekly job to refresh pip cache
-refresh-cache:
-  stage: maintenance
+      with open("out/forecast.txt", "r", encoding="utf-8") as f:
+          forecast = f.read()
+
+      msg = MIMEText(forecast, "plain", "utf-8")
+      msg["Subject"] = "📌 ZeroDay Zen SPY Forecast"
+      msg["From"] = os.environ["EMAIL_USER"]
+      msg["To"] = os.environ["EMAIL_TO"]
+
+      server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
+      server.starttls()
+      server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
+      server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
+      server.quit()
+      EOF
+  artifacts:
+    paths:
+      - out/forecast.json
+      - out/forecast.txt
+    expire_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+
+# -----------------------
+# Stage 3: Deploy (example)
+# -----------------------
+deploy_prod:
+  stage: deploy
+  image: alpine:latest
   script:
-    - rm -rf .cache/pip
+    - echo "Deploying application…"
   only:
-    - schedules   # this runs only if scheduled in GitLab CI/CD > Schedules
+    - main
