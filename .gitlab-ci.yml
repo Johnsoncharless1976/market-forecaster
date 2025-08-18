@@ -1,70 +1,41 @@
-# .gitlab-ci.yml
-# Full pipeline: Stage 1 → Ingest, Stage 2 → Verify, Stage 3 → Snapshot, Stage 4 → Forecast
+image: python:3.11-slim
+
+cache:
+  key: pip-cache
+  paths:
+    - .cache/pip
+
+before_script:
+  - python --version
+  - pip install --upgrade pip
+  - pip install --cache-dir=.cache/pip pandas snowflake-connector-python yfinance
 
 stages:
   - ingest
-  - verify
-  - analyze
+  - snapshot
+  - forecast
+  - maintenance
 
-# -------------------
-# Stage 1 – Ingest Jobs
-# -------------------
-spy_to_snowflake:
+ingest:
   stage: ingest
-  image: python:3.11-slim
   script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python
-    - python src/spy_to_snowflake.py
+    - python src/Spy_BackFill.py
+    - python src/ES_BackFill.py
 
-es_to_snowflake:
-  stage: ingest
-  image: python:3.11-slim
+snapshot:
+  stage: snapshot
   script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python yfinance
-    - python src/es_to_snowflake.py
-
-vix_vvix_to_snowflake:
-  stage: ingest
-  image: python:3.11-slim
-  script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python
-    - python src/vix_vvix_to_snowflake.py
-
-# -------------------
-# Stage 2 – Verify
-# -------------------
-verify_ingestion:
-  stage: verify
-  image: python:3.11-slim
-  script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python
-    - python src/verify_ingestion.py
-  needs: ["spy_to_snowflake", "es_to_snowflake", "vix_vvix_to_snowflake"]
-
-# -------------------
-# Stage 3 – Snapshot
-# -------------------
-stage3_snapshot:
-  stage: analyze
-  image: python:3.11-slim
-  script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python yfinance
     - python src/stage3_snapshot.py
-  needs: ["verify_ingestion"]
 
-# -------------------
-# Stage 4 – Forecast
-# -------------------
-stage4_forecast:
-  stage: analyze
-  image: python:3.11-slim
+forecast:
+  stage: forecast
   script:
-    - pip install --upgrade pip
-    - pip install pandas snowflake-connector-python yfinance
     - python src/stage4_forecast.py
-  needs: ["stage3_snapshot"]
+
+# 🧹 Weekly job to refresh pip cache
+refresh-cache:
+  stage: maintenance
+  script:
+    - rm -rf .cache/pip
+  only:
+    - schedules   # this runs only if scheduled in GitLab CI/CD > Schedules
