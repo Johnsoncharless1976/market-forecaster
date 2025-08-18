@@ -1,60 +1,53 @@
-# GitLab CI/CD Pipeline
-# Stages:
-#   1. ingest → pulls market data daily into Snowflake
-#   2. verify → checks that the latest rows are in place
+# .gitlab-ci.yml
+# Full pipeline: Stage 1 → Ingest, Stage 2 → Verify, Stage 3 → Snapshot, Stage 4 → Forecast
+
 stages:
   - ingest
   - verify
   - analyze
 
-# ----------------------
-# SPY ingestion (Polygon)
-# ----------------------
+# -------------------
+# Stage 1 – Ingest Jobs
+# -------------------
 spy_to_snowflake:
   stage: ingest
-  image: python:3.13
-  before_script:
-    - pip install --no-cache-dir snowflake-connector-python requests
+  image: python:3.11-slim
   script:
-    - python src/data_ingestion.py
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python
+    - python src/spy_to_snowflake.py
 
-# ------------------------
-# VIX + VVIX ingestion (CBOE)
-# ------------------------
-vix_vvix_to_snowflake:
-  stage: ingest
-  image: python:3.13
-  before_script:
-    - pip install --no-cache-dir snowflake-connector-python requests
-  script:
-    - python src/data_ingestion_vix.py
-
-# ------------------------
-# ES (E-mini Futures) ingestion (Yahoo Finance)
-# ------------------------
 es_to_snowflake:
   stage: ingest
-  image: python:3.13
-  before_script:
-    - pip install --no-cache-dir snowflake-connector-python yfinance
+  image: python:3.11-slim
   script:
-    - python src/data_ingestion_es.py
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python yfinance
+    - python src/es_to_snowflake.py
 
-# ------------------------
-# Verification job
-# ------------------------
+vix_vvix_to_snowflake:
+  stage: ingest
+  image: python:3.11-slim
+  script:
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python
+    - python src/vix_vvix_to_snowflake.py
+
+# -------------------
+# Stage 2 – Verify
+# -------------------
 verify_ingestion:
   stage: verify
-  image: python:3.13
-  needs:
-    - spy_to_snowflake
-    - vix_vvix_to_snowflake
-    - es_to_snowflake
-  before_script:
-    - pip install --no-cache-dir snowflake-connector-python
+  image: python:3.11-slim
   script:
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python
     - python src/verify_ingestion.py
+  needs: ["spy_to_snowflake", "es_to_snowflake", "vix_vvix_to_snowflake"]
 
+# -------------------
+# Stage 3 – Snapshot
+# -------------------
 stage3_snapshot:
   stage: analyze
   image: python:3.11-slim
@@ -64,6 +57,9 @@ stage3_snapshot:
     - python src/stage3_snapshot.py
   needs: ["verify_ingestion"]
 
+# -------------------
+# Stage 4 – Forecast
+# -------------------
 stage4_forecast:
   stage: analyze
   image: python:3.11-slim
@@ -72,4 +68,3 @@ stage4_forecast:
     - pip install pandas snowflake-connector-python yfinance
     - python src/stage4_forecast.py
   needs: ["stage3_snapshot"]
-
