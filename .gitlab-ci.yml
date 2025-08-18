@@ -1,24 +1,8 @@
 # .gitlab-ci.yml
 
 stages:
-  - test
   - forecast
   - deploy
-
-# -----------------------
-# Stage 1: Tests (example)
-# -----------------------
-unit_tests:
-  stage: test
-  image: python:3.11-slim
-  script:
-    - pip install -r requirements.txt
-    - pytest -v
-  artifacts:
-    when: always
-    paths:
-      - tests/reports/
-    expire_in: 7 days
 
 # -----------------------
 # Stage 4 Forecast Job
@@ -55,10 +39,11 @@ stage4_forecast:
       - out/forecast.txt
     expire_in: 7 days
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'   # run on schedule
+    - when: manual                              # allow manual trigger in UI
 
 # -----------------------
-# Stage 3: Deploy (example)
+# Stage 3: Deploy (optional placeholder)
 # -----------------------
 deploy_prod:
   stage: deploy
