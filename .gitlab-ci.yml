@@ -54,9 +54,22 @@ verify_ingestion:
     - pip install --no-cache-dir snowflake-connector-python
   script:
     - python src/verify_ingestion.py
-    
+
 stage3_snapshot:
   stage: analyze
+  image: python:3.11-slim
   script:
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python yfinance
     - python src/stage3_snapshot.py
   needs: ["verify_ingestion"]
+
+stage4_forecast:
+  stage: analyze
+  image: python:3.11-slim
+  script:
+    - pip install --upgrade pip
+    - pip install pandas snowflake-connector-python yfinance
+    - python src/stage4_forecast.py
+  needs: ["stage3_snapshot"]
+
