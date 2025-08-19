@@ -2,7 +2,11 @@
 
 import snowflake.connector
 import pandas as pd
+import numpy as np
+import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime
+import os
 
 # --- Snowflake connection ---
 conn = snowflake.connector.connect(
@@ -14,79 +18,165 @@ conn = snowflake.connector.connect(
     schema="FORECASTING"
 )
 
-# --- Pull most recent changes and correlations ---
+# --- Queries ---
 query_changes = "SELECT * FROM MARKET_CHANGES ORDER BY date DESC LIMIT 1;"
-query_corr = """
-SELECT * FROM (
-    SELECT date, spy_close, es_close, vix_close, vvix_close
-    FROM MARKET_MASTER
-    ORDER BY date DESC
-    LIMIT 60
-) sub
+query_hist = """
+SELECT date, spy_close, es_close, vix_close, vvix_close
+FROM MARKET_MASTER
+ORDER BY date DESC
+LIMIT 60
 """
+
+# --- Load Data ---
 df_changes = pd.read_sql(query_changes, conn)
-df_corr_base = pd.read_sql(query_corr, conn)
+df_hist = pd.read_sql(query_hist, conn)
 conn.close()
 
 df_changes.columns = df_changes.columns.str.lower()
-df_corr_base.columns = df_corr_base.columns.str.lower()
+df_hist.columns = df_hist.columns.str.lower()
+df_hist["date"] = pd.to_datetime(df_hist["date"])
+df_hist.set_index("date", inplace=True)
+df_hist = df_hist.sort_index()  # oldest → newest
 
 # --- Rolling correlations (last 30 days) ---
-df_corr_base["date"] = pd.to_datetime(df_corr_base["date"])
-df_corr_base.set_index("date", inplace=True)
-
 corr_df = pd.DataFrame({
-    "spy_es_corr": df_corr_base["spy_close"].rolling(30).corr(df_corr_base["es_close"]),
-    "spy_vix_corr": df_corr_base["spy_close"].rolling(30).corr(df_corr_base["vix_close"]),
-    "vix_vvix_corr": df_corr_base["vix_close"].rolling(30).corr(df_corr_base["vvix_close"])
+    "spy_es_corr": df_hist["spy_close"].rolling(30).corr(df_hist["es_close"]),
+    "spy_vix_corr": df_hist["spy_close"].rolling(30).corr(df_hist["vix_close"]),
+    "vix_vvix_corr": df_hist["vix_close"].rolling(30).corr(df_hist["vvix_close"])
 })
 latest_corr = corr_df.dropna().iloc[-1]
 
-# --- Forecast Bias Logic ---
+# --- Daily pct moves ---
 spy_pct = float(df_changes["spy_pct"].iloc[0])
 es_pct  = float(df_changes["es_pct"].iloc[0])
 vix_pct = float(df_changes["vix_pct"].iloc[0])
 vvix_pct = float(df_changes["vvix_pct"].iloc[0])
 
-if spy_pct < -0.5 and latest_corr.spy_vix_corr < -0.6:
+# --- Technicals: RSI (14) ---
+def compute_rsi(series, period=14):
+    delta = series.diff()
+    up = delta.clip(lower=0)
+    down = -1 * delta.clip(upper=0)
+    ma_up = up.rolling(period).mean()
+    ma_down = down.rolling(period).mean()
+    rs = ma_up / ma_down
+    return 100 - (100 / (1 + rs))
+
+df_hist["rsi"] = compute_rsi(df_hist["spy_close"])
+latest_rsi = df_hist["rsi"].iloc[-1]
+
+# --- Support/Resistance (last 20 days) ---
+lookback = df_hist.tail(20)
+support = round(lookback["spy_close"].min(), 2)
+resistance = round(lookback["spy_close"].max(), 2)
+
+# ATR bands
+df_hist["hl"] = df_hist["spy_close"].diff().abs()  # crude since no OHLC
+atr = df_hist["hl"].rolling(14).mean().iloc[-1]
+last_close = df_hist["spy_close"].iloc[-1]
+atr_support = round(last_close - atr, 2)
+atr_resistance = round(last_close + atr, 2)
+
+# --- Forecast Bias Logic ---
+if spy_pct < -0.5 and latest_corr.spy_vix_corr < -0.6 and latest_rsi < 40:
     bias = "Bearish"
-elif spy_pct > 0.5 and latest_corr.spy_vix_corr > -0.3:
+elif spy_pct > 0.5 and latest_corr.spy_vix_corr > -0.3 and latest_rsi > 60:
     bias = "Bullish"
 else:
     bias = "Neutral"
 
+# --- Volatility Context ---
+vix_level = df_hist["vix_close"].iloc[-1]
+vvix_level = df_hist["vvix_close"].iloc[-1]
+vol_comment = []
+if vix_level > 20:
+    vol_comment.append("Risk-off regime (VIX > 20)")
+elif vix_level < 15:
+    vol_comment.append("Calm regime (VIX < 15)")
+if vvix_pct > vix_pct:
+    vol_comment.append("VVIX rising faster → vol pressure building")
+
+vol_context = "; ".join(vol_comment) if vol_comment else "Stable vol conditions"
+
+# --- Headline (RSS stub) ---
+def get_headline():
+    try:
+        rss_url = "https://www.reuters.com/rssFeed/markets"
+        resp = requests.get(rss_url, timeout=5)
+        root = ET.fromstring(resp.content)
+        item = root.find(".//item")
+        if item is not None:
+            return item.find("title").text, item.find("link").text
+    except Exception:
+        pass
+    return ("U.S. CPI hotter than expected; rate cut odds repriced lower",
+            "https://www.reuters.com/markets/us-cpi-aug2025")
+
+headline, headline_link = get_headline()
+
 # --- Forecast Output ---
 today = datetime.now().strftime("%A, %b %d, %Y @ %I:%M %p ET")
 
-print(f"\n=== ZeroDay Zen SPX Forecast Update – {today} ===")
+summary_text = f"""
+=== ZeroDay Zen SPY Forecast Update – {today} ===
 
-# --- Headline placeholder (to be replaced by NLP in Stage 7) ---
-headline = "U.S. CPI hotter than expected; rate cut odds repriced lower"
-headline_link = "https://www.reuters.com/markets/us-cpi-aug2025"
-print("\n📰 Headline of the Day:")
-print(f"{headline}\nLink: {headline_link}\n")
+📰 Headline of the Day:
+{headline}
+Link: {headline_link}
 
-print(f"🧠 Bias: {bias} (SPY {spy_pct:+.2f}%, ES {es_pct:+.2f}%, VIX {vix_pct:+.2f}%, VVIX {vvix_pct:+.2f}%)\n")
+🧠 Bias: {bias} 
+(SPY {spy_pct:+.2f}%, ES {es_pct:+.2f}%, VIX {vix_pct:+.2f}%, VVIX {vvix_pct:+.2f}%, RSI {latest_rsi:.1f})
 
-print("Technical Structure Overview (SPY | ES | VIX)")
-print(f"SPY: {df_corr_base['spy_close'].iloc[-1]:.2f} | ES: {df_corr_base['es_close'].iloc[-1]:.2f} | VIX: {df_corr_base['vix_close'].iloc[-1]:.2f} | VVIX: {df_corr_base['vvix_close'].iloc[-1]:.2f}\n")
+Technical Structure Overview (SPY | ES | VIX | VVIX)
+SPY: {last_close:.2f} | ES: {df_hist['es_close'].iloc[-1]:.2f} | VIX: {vix_level:.2f} | VVIX: {vvix_level:.2f}
 
-print("Key Support / Resistance Zones (SPY)")
-print("- Resistance: Placeholder (will come from Zen Grid)")
-print("- Support: Placeholder (will come from Zen Grid)\n")
+Key Support / Resistance Zones (SPY)
+- Resistance: {resistance} / ATR-band {atr_resistance}
+- Support: {support} / ATR-band {atr_support}
 
-print("Volatility Outlook")
-print(f"SPY–ES Corr: {latest_corr.spy_es_corr:.3f} | SPY–VIX Corr: {latest_corr.spy_vix_corr:.3f} | VIX–VVIX Corr: {latest_corr.vix_vvix_corr:.3f}")
-print("Interpretation: Placeholder text (will refine with thresholds)\n")
+Volatility Outlook
+SPY–ES Corr: {latest_corr.spy_es_corr:.3f} | SPY–VIX Corr: {latest_corr.spy_vix_corr:.3f} | VIX–VVIX Corr: {latest_corr.vix_vvix_corr:.3f}
+Interpretation: {vol_context}
 
-print("Macro & Event Context")
-print("Econ reports, FedWatch, headlines, and whispers not yet integrated (Stage 7)\n")
+Macro & Event Context
+Econ reports, FedWatch, headlines, and whispers not yet integrated (Stage 7)
 
-print("Probable Paths (next 3–5 hours)")
-print("Base Case – Placeholder\nUpside – Placeholder\nDownside – Placeholder\n")
+Probable Paths (next 3–5 hours)
+Base Case – Placeholder
+Upside – Placeholder
+Downside – Placeholder
 
-print("Potential 0DTE Spread Context (Educational Only)")
-print("Placeholder spreads until Zen Grid levels are wired in\n")
+Potential 0DTE Spread Context (Educational Only)
+Placeholder spreads until Zen Grid levels are wired in
 
-print("📌 Forecast Summary")
-print(f"Bias = {bias}, SPY daily % = {spy_pct:+.2f}, VIX daily % = {vix_pct:+.2f}, Corr(SPY–VIX) = {latest_corr.spy_vix_corr:.3f}")
+📌 Forecast Summary
+Bias = {bias}, SPY daily % = {spy_pct:+.2f}, VIX daily % = {vix_pct:+.2f}, RSI = {latest_rsi:.1f}
+"""
+
+print(summary_text)
+
+# --- Save Outputs ---
+import os, json
+
+os.makedirs("out", exist_ok=True)
+
+forecast_json = {
+    "date": str(datetime.now().date()),
+    "bias": bias,
+    "spy_close": float(last_close),
+    "support": [support, atr_support],
+    "resistance": [resistance, atr_resistance],
+    "rsi": round(float(latest_rsi), 2),
+    "volatility": {
+        "vix": float(vix_level),
+        "vvix": float(vvix_level),
+        "context": vol_context
+    },
+    "headline": {"title": headline, "link": headline_link}
+}
+
+with open("out/forecast.json", "w", encoding="utf-8") as jf:
+    json.dump(forecast_json, jf, indent=2)
+
+with open("out/forecast.txt", "w", encoding="utf-8") as tf:
+    tf.write(summary_text)
