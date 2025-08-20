@@ -2,105 +2,101 @@
 import os
 import smtplib
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email import encoders
+from datetime import datetime
 
 # --- Load forecast text ---
 with open("out/forecast.txt", "r", encoding="utf-8") as f:
-    forecast = f.read()
+    raw_forecast = f.read()
 
-# --- Extract key sections from the forecast text ---
-lines = forecast.splitlines()
+# --- Extract values (fallback defaults if not present) ---
+def extract_line(keyword, default="N/A"):
+    for line in raw_forecast.splitlines():
+        if keyword in line:
+            return line
+    return default
 
-headline = next((l for l in lines if l.startswith("📰")), "📰 Headline: (not found)")
-bias_line = next((l for l in lines if "Bias:" in l or "Bias =" in l), "")
-tech_section = "\n".join(lines[lines.index("Technical Structure Overview (SPY | ES | VIX | VVIX)"):]) if "Technical Structure Overview" in forecast else ""
-support_section = "\n".join(l for l in lines if "Support" in l or "Resistance" in l)
-vol_section = "\n".join(lines[lines.index("Volatility Outlook"):]) if "Volatility Outlook" in forecast else ""
-macro_section = "\n".join(lines[lines.index("Macro & Event Context"):]) if "Macro & Event Context" in forecast else ""
-paths_section = "\n".join(lines[lines.index("Probable Paths (next 3–5 hours)"):]) if "Probable Paths" in forecast else ""
-spreads_section = "\n".join(lines[lines.index("Potential 0DTE Spread Context (Educational Only)"):]) if "Potential 0DTE" in forecast else ""
-summary_section = "\n".join(lines[lines.index("📌 Forecast Summary"):]) if "📌 Forecast Summary" in forecast else ""
+bias_line   = extract_line("Bias")
+spy_line    = extract_line("SPY:")
+es_line     = extract_line("ES:")
+vix_line    = extract_line("VIX:")
+vvix_line   = extract_line("VVIX:")
+headline    = extract_line("Headline", "No headline available")
 
-# --- Bias color cue ---
-bias_color = "#888"
+# --- Current timestamp ---
+today = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+
+# --- Bias color ---
+bias_color = "#808080"  # default gray
 if "Bullish" in bias_line:
     bias_color = "#2e8b57"  # green
 elif "Bearish" in bias_line:
     bias_color = "#b22222"  # red
-elif "Neutral" in bias_line:
-    bias_color = "#808080"  # gray
 
-# --- HTML body (report style) ---
+# --- Build HTML email ---
 html_body = f"""
 <html>
-  <body style="font-family:Arial, sans-serif; background-color:#f9f9f9; padding:20px; color:#222;">
-    <table width="100%" style="max-width:700px; margin:auto; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-      <tr>
-        <td style="padding:20px;">
-          <h2 style="margin:0 0 5px;">📌 ZeroDay Zen SPY Forecast</h2>
-          <p style="font-size:12px; color:#666; margin:0 0 15px;">
-            {os.environ.get("EMAIL_USER", "Zen Market AI")} · Sent automatically by GitLab CI
-          </p>
-          <hr style="border:none; border-top:1px solid #ddd; margin:15px 0;">
+  <body style="font-family: Arial, sans-serif; background-color:#fafafa; color:#222; padding:20px;">
+    <h2 style="margin:0;">📈 ZeroDay Zen Forecast – {today}</h2>
+    <p style="font-size:12px; color:#666; margin-top:2px;">
+      Sent automatically by Zen Market AI
+    </p>
+    <hr style="border:none; border-top:1px solid #ddd; margin:15px 0;">
 
-          <h3>📰 Headline of the Day</h3>
-          <p style="margin:5px 0 15px; font-size:14px;">{headline}</p>
+    <p><b>SPX Spot:</b> {spy_line.replace("SPY:", "").strip()}<br>
+       <b>/MES:</b> {es_line.replace("ES:", "").strip()}<br>
+       <b>VIX:</b> {vix_line.replace("VIX:", "").strip()}<br>
+       <b>VVIX:</b> {vvix_line.replace("VVIX:", "").strip()}</p>
 
-          <h3>🧠 Bias</h3>
-          <p style="color:{bias_color}; font-size:16px; font-weight:bold; margin:5px 0 15px;">{bias_line}</p>
+    <h3>🔍 Technical & Volatility Structure</h3>
+    <p>
+      {spy_line}<br>
+      {es_line}<br>
+      {vix_line} / {vvix_line}
+    </p>
 
-          <h3>📊 Technical Structure</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{tech_section}</pre>
+    <h3>🧠 Bias</h3>
+    <p style="color:{bias_color}; font-weight:bold; font-size:14px;">
+      {bias_line.replace("Bias", "").strip()}
+    </p>
 
-          <h3>🔔 Support / Resistance</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{support_section}</pre>
+    <h3>🔑 Key Levels</h3>
+    <p>
+      Resistance: (auto-filled soon)<br>
+      Support: (auto-filled soon)
+    </p>
 
-          <h3>📉 Volatility Outlook</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{vol_section}</pre>
+    <h3>📊 Probable Path</h3>
+    <p>
+      Base Case: (auto-filled soon)<br>
+      Bear Case: (auto-filled soon)<br>
+      Bull Case: (auto-filled soon)
+    </p>
 
-          <h3>🌎 Macro & Events</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{macro_section}</pre>
+    <h3>⚖️ Trade Implications</h3>
+    <p>
+      (contextual notes will be populated from Stage 6+)
+    </p>
 
-          <h3>📈 Probable Paths (3–5 hrs)</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{paths_section}</pre>
+    <h3>🌍 Context / News Check</h3>
+    <p>{headline}</p>
 
-          <h3>📝 0DTE Spread Context</h3>
-          <pre style="background:#f6f6f6; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap;">{spreads_section}</pre>
+    <h3>✅ Summary</h3>
+    <p>
+      {bias_line}. Watch SPX key levels and VIX for confirmation.
+    </p>
 
-          <h3>📌 Forecast Summary</h3>
-          <pre style="background:#f0f8ff; padding:10px; border-radius:6px; font-size:13px; white-space:pre-wrap; font-weight:bold;">{summary_section}</pre>
-
-          <hr style="border:none; border-top:1px solid #ddd; margin:20px 0;">
-          <p style="font-size:11px; color:#888;">End of forecast</p>
-        </td>
-      </tr>
-    </table>
+    <hr style="border:none; border-top:1px solid #ddd; margin:20px 0;">
+    <p style="font-size:11px; color:#888;">End of forecast</p>
   </body>
 </html>
 """
 
-# --- Build multipart email ---
-msg = MIMEMultipart()
-msg["Subject"] = "📌 ZeroDay Zen SPY Forecast"
+# --- Send email ---
+msg = MIMEText(html_body, "html", "utf-8")
+msg["Subject"] = "📌 ZeroDay Zen Forecast"
 msg["From"] = os.environ["EMAIL_USER"]
 msg["To"] = os.environ["EMAIL_TO"]
 
-# Attach HTML body
-msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-# Attach forecast.json if it exists
-json_path = "out/forecast.json"
-if os.path.exists(json_path):
-    with open(json_path, "rb") as f:
-        part = MIMEBase("application", "octet-stream")
-        part.set_payload(f.read())
-    encoders.encode_base64(part)
-    part.add_header("Content-Disposition", f'attachment; filename="{os.path.basename(json_path)}"')
-    msg.attach(part)
-
-# --- Send email ---
 server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
 server.starttls()
 server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
