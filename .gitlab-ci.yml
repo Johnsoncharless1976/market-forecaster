@@ -16,43 +16,51 @@ stage4_forecast:
     - python src/stage4_forecast.py
     - |
       python - <<'EOF'
-      import smtplib, os
-      from email.mime.text import MIMEText
+        import smtplib, os
+        from email.mime.text import MIMEText
 
-      with open("out/forecast.txt", "r", encoding="utf-8") as f:
-          forecast = f.read()
+        with open("out/forecast.txt", "r", encoding="utf-8") as f:
+            forecast = f.read()
 
-      # Convert plain forecast into HTML with <pre> for formatting
-      html_body = f"""
-      <html>
-        <body style="font-family:Arial, sans-serif; color:#222;">
-          <h2>📌 ZeroDay Zen SPY Forecast</h2>
-          <pre style="font-size:14px; line-height:1.4; white-space:pre-wrap;">{forecast}</pre>
-          <p style="font-size:12px; color:gray;">Sent automatically by GitLab CI · {os.environ["EMAIL_USER"]}</p>
-        </body>
-      </html>
-      """
+        bias_line = next((line for line in forecast.splitlines() if "Bias:" in line), "")
+        bias_color = "#888"
+        if "Bullish" in bias_line:
+            bias_color = "#2e8b57"
+        elif "Bearish" in bias_line:
+            bias_color = "#b22222"
 
-      msg = MIMEText(html_body, "html", "utf-8")
-      msg["Subject"] = "📌 ZeroDay Zen SPY Forecast"
-      msg["From"] = os.environ["EMAIL_USER"]
-      msg["To"] = os.environ["EMAIL_TO"]
+        html_body = f"""
+        <html>
+          <body style="font-family:Arial, sans-serif; color:#222; background-color:#fafafa; padding:20px;">
+            <h2 style="margin-bottom:5px;">📌 ZeroDay Zen SPY Forecast</h2>
+            <p style="font-size:12px; color:#666; margin-top:0;">
+              {os.environ["EMAIL_USER"]} · Sent automatically by GitLab CI
+            </p>
+            <hr style="border:none; border-top:1px solid #ddd; margin:15px 0;">
+            <pre style="font-size:14px; line-height:1.4; white-space:pre-wrap;">{forecast}</pre>
+          </body>
+        </html>
+        """
 
-      server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
-      server.starttls()
-      server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
-      server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
-      server.quit()
+        msg = MIMEText(html_body, "html", "utf-8")
+        msg["Subject"] = "📌 ZeroDay Zen SPY Forecast"
+        msg["From"] = os.environ["EMAIL_USER"]
+        msg["To"] = os.environ["EMAIL_TO"]
+
+        server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
+        server.starttls()
+        server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
+        server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
+        server.quit()
       EOF
-
   artifacts:
     paths:
       - out/forecast.json
       - out/forecast.txt
     expire_in: 7 days
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'   # run on schedule
-    - when: manual                              # allow manual trigger in UI
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - when: manual
 
 # -----------------------
 # Stage 3: Deploy (optional placeholder)
