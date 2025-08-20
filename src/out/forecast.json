@@ -1,0 +1,23 @@
+{
+  "date": "2025-08-19",
+  "bias": "Neutral",
+  "spy_close": 643.44,
+  "support": [
+    622.0,
+    639.9
+  ],
+  "resistance": [
+    645.0,
+    646.98
+  ],
+  "rsi": 56.5,
+  "volatility": {
+    "vix": 15.09,
+    "vvix": 97.85,
+    "context": "Stable vol conditions"
+  },
+  "headline": {
+    "title": "U.S. CPI hotter than expected; rate cut odds repriced lower",
+    "link": "https://www.reuters.com/markets/us-cpi-aug2025"
+  }
+}

@@ -1,0 +1,34 @@
+
+=== ZeroDay Zen SPY Forecast Update – Tuesday, Aug 19, 2025 @ 07:47 AM ET ===
+
+📰 Headline of the Day:
+U.S. CPI hotter than expected; rate cut odds repriced lower
+Link: https://www.reuters.com/markets/us-cpi-aug2025
+
+🧠 Bias: Neutral 
+(SPY -0.24%, ES -0.30%, VIX +0.60%, VVIX -0.15%, RSI 56.5)
+
+Technical Structure Overview (SPY | ES | VIX | VVIX)
+SPY: 643.44 | ES: 6471.50 | VIX: 15.09 | VVIX: 97.85
+
+Key Support / Resistance Zones (SPY)
+- Resistance: 645.0 / ATR-band 646.98
+- Support: 622.0 / ATR-band 639.9
+
+Volatility Outlook
+SPY–ES Corr: 0.995 | SPY–VIX Corr: -0.719 | VIX–VVIX Corr: 0.551
+Interpretation: Stable vol conditions
+
+Macro & Event Context
+Econ reports, FedWatch, headlines, and whispers not yet integrated (Stage 7)
+
+Probable Paths (next 3–5 hours)
+Base Case – Placeholder
+Upside – Placeholder
+Downside – Placeholder
+
+Potential 0DTE Spread Context (Educational Only)
+Placeholder spreads until Zen Grid levels are wired in
+
+📌 Forecast Summary
+Bias = Neutral, SPY daily % = -0.24, VIX daily % = +0.60, RSI = 56.5

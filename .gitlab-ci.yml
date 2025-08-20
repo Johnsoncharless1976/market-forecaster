@@ -22,7 +22,18 @@ stage4_forecast:
       with open("out/forecast.txt", "r", encoding="utf-8") as f:
           forecast = f.read()
 
-      msg = MIMEText(forecast, "plain", "utf-8")
+      # Convert plain forecast into HTML with <pre> for formatting
+      html_body = f"""
+      <html>
+        <body style="font-family:Arial, sans-serif; color:#222;">
+          <h2>📌 ZeroDay Zen SPY Forecast</h2>
+          <pre style="font-size:14px; line-height:1.4; white-space:pre-wrap;">{forecast}</pre>
+          <p style="font-size:12px; color:gray;">Sent automatically by GitLab CI · {os.environ["EMAIL_USER"]}</p>
+        </body>
+      </html>
+      """
+
+      msg = MIMEText(html_body, "html", "utf-8")
       msg["Subject"] = "📌 ZeroDay Zen SPY Forecast"
       msg["From"] = os.environ["EMAIL_USER"]
       msg["To"] = os.environ["EMAIL_TO"]
@@ -33,6 +44,7 @@ stage4_forecast:
       server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
       server.quit()
       EOF
+
   artifacts:
     paths:
       - out/forecast.json
