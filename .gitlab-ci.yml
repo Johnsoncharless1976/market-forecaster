@@ -12,14 +12,13 @@ stage4_forecast:
   stage: forecast
   image: python:3.11-slim
   variables:
-    PYTHONPATH: "${CI_PROJECT_DIR}/src"
+    PYTHONPATH: "${CI_PROJECT_DIR}"
   before_script:
-    # Install Python dependencies
     - pip install -r requirements.txt
   script:
-    # Run forecast generator
+    # Sanity check import before running
+    - python -c "import src.zen_rules; print('✅ zen_rules import works')"
     - python src/stage4_forecast.py
-    # Send email with HTML formatting
     - python src/send_email.py
   artifacts:
     paths:
@@ -27,9 +26,7 @@ stage4_forecast:
       - out/forecast.txt
     expire_in: 7 days
   rules:
-    # Run automatically on schedule
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    # Allow manual trigger from GitLab UI
     - when: manual
 
 # -----------------------
