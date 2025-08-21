@@ -82,18 +82,28 @@ def event_filter(events: list) -> str:
 
 
 # --- 6. Headline Overlay ---
-def headline_overlay(headline: str) -> str:
+def headline_overlay(headline) -> str:
     """
     Classify headline sentiment.
-    Very basic placeholder until NLP model integrated.
+    Accepts either a string or dict (with "title" field).
+    Always returns a classification string.
     """
-    text = headline.lower()
+    # Normalize headline to text
+    if isinstance(headline, dict):
+        text = str(headline.get("title", ""))
+    else:
+        text = str(headline)
+
+    text = text.lower()
+
     if any(word in text for word in ["hawkish", "tightening", "yields spike", "inflation hot"]):
         return "hawkish"
     elif any(word in text for word in ["rally", "bullish", "optimism", "strong earnings"]):
         return "bullish"
     elif any(word in text for word in ["geopolitical", "war", "default", "risk-off", "fear"]):
         return "risk-off"
+    elif text.strip() == "":
+        return "noise"
     else:
         return "noise"
 

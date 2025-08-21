@@ -16,7 +16,15 @@ es_price    = float(forecast_data.get("es", 0.0))
 vix_value   = float(forecast_data.get("vix", 0.0))
 vvix_value  = float(forecast_data.get("vvix", 0.0))
 rsi_value   = float(forecast_data.get("rsi", 50.0))
-headline    = forecast_data.get("headline", "No headline available")
+
+# Handle headline dict vs. string
+headline_data = forecast_data.get("headline", {})
+if isinstance(headline_data, dict):
+    headline_text = headline_data.get("title", "No headline available")
+    headline_link = headline_data.get("link", "")
+else:
+    headline_text = str(headline_data)
+    headline_link = ""
 
 # --- Current timestamp ---
 today = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
@@ -33,7 +41,7 @@ rsi_status      = zen_rules.rsi_check(rsi_value)
 candle_status   = zen_rules.candle_structure(last_candles)
 vol_status      = zen_rules.volatility_overlay(vix_value, vvix_value, vix_change, vvix_change)
 event_status    = zen_rules.event_filter(events_today)
-headline_status = zen_rules.headline_overlay(headline)
+headline_status = zen_rules.headline_overlay(headline_text)
 
 zen_bias = zen_rules.combine_bias(
     straddle_status, rsi_status, candle_status,
@@ -80,7 +88,14 @@ else:
     spread_text = "Neutral Zone – consider Iron Condor around straddle range."
 
 # --- Headline interpretation ---
-headline_interp = f"{headline}<br><i>Zen read: {headline_status}</i>"
+if headline_link:
+    headline_interp = (
+        f"📰 {headline_text}<br>"
+        f"<a href='{headline_link}'>{headline_link}</a><br>"
+        f"<i>Zen read: {headline_status}</i>"
+    )
+else:
+    headline_interp = f"📰 {headline_text}<br><i>Zen read: {headline_status}</i>"
 
 # --- Build HTML email ---
 html_body = f"""
