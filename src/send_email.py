@@ -1,49 +1,30 @@
 # src/send_email.py
 import os
 import smtplib
+import json
 from email.mime.text import MIMEText
 from datetime import datetime
 from src import zen_rules   # << Zen engine
 
-# --- Load forecast text ---
-with open("out/forecast.txt", "r", encoding="utf-8") as f:
-    raw_forecast = f.read()
+# --- Load forecast JSON ---
+with open("out/forecast.json", "r", encoding="utf-8") as f:
+    forecast_data = json.load(f)
 
-# --- Extract helper ---
-def extract_line(keyword, default="N/A"):
-    for line in raw_forecast.splitlines():
-        if keyword in line:
-            return line
-    return default
-
-# --- Pull values from forecast file ---
-bias_line   = extract_line("Bias")
-spy_line    = extract_line("SPY:")
-es_line     = extract_line("ES:")
-vix_line    = extract_line("VIX:")
-vvix_line   = extract_line("VVIX:")
-headline    = extract_line("Headline", "No headline available")
+# --- Extract values from JSON ---
+spy_price   = float(forecast_data.get("spy", 0.0))
+es_price    = float(forecast_data.get("es", 0.0))
+vix_value   = float(forecast_data.get("vix", 0.0))
+vvix_value  = float(forecast_data.get("vvix", 0.0))
+rsi_value   = float(forecast_data.get("rsi", 50.0))
+headline    = forecast_data.get("headline", "No headline available")
 
 # --- Current timestamp ---
 today = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
 
-# --- Parse numbers (safe fallback if missing) ---
-def safe_float(text):
-    try:
-        return float(text)
-    except:
-        return 0.0
-
-spy_price  = safe_float(spy_line.replace("SPY:", "").strip())
-es_price   = safe_float(es_line.replace("ES:", "").strip())
-vix_value  = safe_float(vix_line.replace("VIX:", "").strip())
-vvix_value = safe_float(vvix_line.replace("VVIX:", "").strip())
-
-# Placeholder values until live data pipeline completes
-rsi_value     = 55.0
-last_candles  = [{"o":1,"h":2,"l":1,"c":1.5},{"o":1.5,"h":2,"l":1.2,"c":1.7}]
-vix_change    = 0.2
-vvix_change   = 0.5
+# Placeholder values until Stage 6/7 data sources wired in
+last_candles  = []
+vix_change    = 0.0
+vvix_change   = 0.0
 events_today  = []
 
 # --- Run Zen Rules ---
@@ -54,8 +35,10 @@ vol_status      = zen_rules.volatility_overlay(vix_value, vvix_value, vix_change
 event_status    = zen_rules.event_filter(events_today)
 headline_status = zen_rules.headline_overlay(headline)
 
-zen_bias = zen_rules.combine_bias(straddle_status, rsi_status, candle_status,
-                                  vol_status, event_status, headline_status)
+zen_bias = zen_rules.combine_bias(
+    straddle_status, rsi_status, candle_status,
+    vol_status, event_status, headline_status
+)
 
 # --- Bias color mapping ---
 bias_color = "#808080"
@@ -65,8 +48,8 @@ elif "Bearish" in zen_bias:
     bias_color = "#b22222"
 
 # --- Key Levels ---
-support_level = round(spy_price - 15, 2)   # placeholder: SPY -15
-resistance_level = round(spy_price + 15, 2) # placeholder: SPY +15
+support_level    = round(spy_price - 15, 2)   # placeholder until Zen Grid
+resistance_level = round(spy_price + 15, 2)
 
 # --- Probable Path ---
 if "Bullish" in zen_bias:
@@ -84,9 +67,15 @@ else:
 
 # --- Trade Implications (mock until live options feed) ---
 if "Bullish" in zen_bias:
-    spread_text = f"Bull Put Credit Spread: Sell {support_level} / Buy {support_level-20} (0DTE)<br>Cost: ~2.10 | Max Return: ~18%"
+    spread_text = (
+        f"Bull Put Credit Spread: Sell {support_level} / Buy {support_level-20} (0DTE)<br>"
+        f"Cost: ~2.10 | Max Return: ~18%"
+    )
 elif "Bearish" in zen_bias:
-    spread_text = f"Bear Call Credit Spread: Sell {resistance_level} / Buy {resistance_level+20} (0DTE)<br>Cost: ~2.25 | Max Return: ~20%"
+    spread_text = (
+        f"Bear Call Credit Spread: Sell {resistance_level} / Buy {resistance_level+20} (0DTE)<br>"
+        f"Cost: ~2.25 | Max Return: ~20%"
+    )
 else:
     spread_text = "Neutral Zone – consider Iron Condor around straddle range."
 

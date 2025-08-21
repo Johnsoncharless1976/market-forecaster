@@ -6,9 +6,9 @@ stages:
   - deploy
 
 # -----------------------
-# Stage 4: Forecast + Email
+# Stage 4 + Email Combined
 # -----------------------
-stage4_forecast:
+stage4_forecast_and_email:
   stage: forecast
   image: python:3.11-slim
   variables:
@@ -16,9 +16,16 @@ stage4_forecast:
   before_script:
     - pip install -r requirements.txt
   script:
-    # Sanity check import before running
+    # ✅ Sanity check: verify package import works
     - python -c "import src.zen_rules; print('✅ zen_rules import works')"
+
+    # Run forecast generator → produces out/forecast.json
     - python src/stage4_forecast.py
+
+    # Sanity check JSON exists
+    - test -f out/forecast.json || (echo '❌ forecast.json missing' && exit 1)
+
+    # Run email sender → consumes forecast.json
     - python src/send_email.py
   artifacts:
     paths:
