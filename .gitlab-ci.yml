@@ -2,30 +2,25 @@
 # Runs daily forecast, ingests data, emails results
 
 stages:
+  - ingest
   - forecast
-  - notify
 
-forecast_job:
+ingest-data:
+  stage: ingest
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python src/data_ingestion.py
+  only:
+    - main
+
+send-forecast:
   stage: forecast
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
-    - python src/stage4_forecast.py
-  artifacts:
-    paths:
-      - forecast_output.txt
-      - out/forecast.json
-
-
-send_email_job:
-  stage: notify
-  image: python:3.11-slim
-  dependencies:
-    - forecast_job
-  script:
-    - pip install -r requirements.txt
-    - python src/send_email.py
+    - python src/forecast.py
   only:
     - main
-
-
+  needs:
+    - ingest-data
