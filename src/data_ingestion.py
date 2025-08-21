@@ -1,118 +1,69 @@
 # src/data_ingestion.py
-# src/data_ingestion.py
-
-import datetime
-import yfinance as yf
 import requests
-import os
-import sys
-from SnowflakeConfig import get_snowflake_connection  # reuse your config
+import pandas as pd
+import snowflake.connector
+from snowflake.connector.pandas_tools import write_pandas
 
-# =============== HELPERS ==================
+# -----------------------------
+# 1. API Keys / Config
+# -----------------------------
+POLYGON_API_KEY = "<YOUR_POLYGON_KEY>"  # already on file with me
+SNOWFLAKE_USER = "<YOUR_SNOWFLAKE_USER>"
+SNOWFLAKE_PASSWORD = "<YOUR_SNOWFLAKE_PASSWORD>"
+SNOWFLAKE_ACCOUNT = "<YOUR_SNOWFLAKE_ACCOUNT>.snowflakecomputing.com"
 
-def insert_to_snowflake(table, date_val, close_val):
-    """Insert a single row into Snowflake"""
-    conn = get_snowflake_connection()
-    cur = conn.cursor()
-    try:
-        query = f"INSERT INTO {table} (DATE, CLOSE) VALUES (%s, %s)"
-        cur.execute(query, (date_val, close_val))
-        rowcount = cur.rowcount
-        conn.commit()
-        if rowcount == 1:
-            print(f"[OK] {table}: {date_val} = {close_val}")
-        else:
-            print(f"[WARN] {table}: No row inserted (maybe duplicate?)")
-    except Exception as e:
-        print(f"[ERR] Failed inserting into {table}: {e}")
-    finally:
-        cur.close()
-        conn.close()
+# -----------------------------
+# 2. Data Fetch Functions
+# -----------------------------
 
+# SPY (Polygon)
+def get_spy():
+    url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
+    resp = requests.get(url).json()
+    data = [{
+        "DATE": pd.to_datetime(resp["results"][0]["t"], unit="ms").date(),
+        "CLOSE": resp["results"][0]["c"]
+    }]
+    return pd.DataFrame(data)
 
+# Yahoo Finance (ES, VIX, VVIX)
+def get_yahoo(symbol, lookback="5d"):
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range={lookback}"
+    resp = requests.get(url).json()["chart"]["result"][0]
+    timestamps = resp["timestamp"]
+    closes = resp["indicators"]["quote"][0]["close"]
+    df = pd.DataFrame({
+        "DATE": pd.to_datetime(timestamps, unit="s").date,
+        "CLOSE": closes
+    })
+    return df.dropna()
 
-# =============== SPY via Polygon ==================
+# -----------------------------
+# 3. Fetch Data
+# -----------------------------
+spy_df = get_spy()
+es_df = get_yahoo("ES=F")      # S&P 500 E-mini futures
+vix_df = get_yahoo("^VIX")
+vvix_df = get_yahoo("^VVIX")
 
-def fetch_spy():
-    api_key = os.getenv("POLYGON_API_KEY")
-    url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?adjusted=true&apiKey={api_key}"
-    r = requests.get(url)
-    r.raise_for_status()
-    data = r.json()
-    if "results" not in data:
-        raise ValueError(f"Polygon returned no SPY data: {data}")
-    result = data["results"][0]
-    date_val = datetime.date.fromtimestamp(result["t"] / 1000)
-    close_val = result["c"]
-    insert_to_snowflake("SPY_HISTORICAL", date_val, close_val)
+# -----------------------------
+# 4. Connect to Snowflake
+# -----------------------------
+conn = snowflake.connector.connect(
+    user=SNOWFLAKE_USER,
+    password=SNOWFLAKE_PASSWORD,
+    account=SNOWFLAKE_ACCOUNT,
+    warehouse="COMPUTE_WH",
+    database="ZEN_MARKET",
+    schema="FORECASTING"
+)
 
+# -----------------------------
+# 5. Insert into Snowflake
+# -----------------------------
+write_pandas(conn, spy_df, "SPY_HISTORICAL")
+write_pandas(conn, es_df, "ES_HISTORICAL")
+write_pandas(conn, vix_df, "VIX_HISTORICAL")
+write_pandas(conn, vvix_df, "VVIX_HISTORICAL")
 
-# =============== ES via Yahoo ==================
-
-def fetch_es():
-    ticker = yf.Ticker("ES=F")
-    hist = ticker.history(period="1d")
-    if hist.empty:
-        raise ValueError("No ES data from Yahoo")
-    date_val = hist.index[-1].date()
-    close_val = hist["Close"].iloc[-1]
-    insert_to_snowflake("ES_HISTORICAL", date_val, float(close_val))
-
-
-# =============== VIX via Polygon ==================
-
-def fetch_vix():
-    api_key = os.getenv("POLYGON_API_KEY")
-    url = f"https://api.polygon.io/v2/aggs/ticker/VIX/prev?adjusted=true&apiKey={api_key}"
-    r = requests.get(url)
-    r.raise_for_status()
-    data = r.json()
-    if "results" not in data:
-        raise ValueError(f"Polygon returned no VIX data: {data}")
-    result = data["results"][0]
-    date_val = datetime.date.fromtimestamp(result["t"] / 1000)
-    close_val = result["c"]
-    insert_to_snowflake("VIX_HISTORICAL", date_val, close_val)
-
-
-# =============== VVIX via Yahoo ==================
-
-def fetch_vvix():
-    ticker = yf.Ticker("^VVIX")
-    hist = ticker.history(period="1d")
-    if hist.empty:
-        raise ValueError("No VVIX data from Yahoo")
-    date_val = hist.index[-1].date()
-    close_val = hist["Close"].iloc[-1]
-    insert_to_snowflake("VVIX_HISTORICAL", date_val, float(close_val))
-
-
-# =============== MAIN ==================
-
-def main():
-    print("=== Starting Daily Ingestion ===")
-    try:
-        fetch_spy()
-    except Exception as e:
-        print(f"[WARN] SPY ingestion failed: {e}")
-
-    try:
-        fetch_es()
-    except Exception as e:
-        print(f"[WARN] ES ingestion failed: {e}")
-
-    try:
-        fetch_vix()
-    except Exception as e:
-        print(f"[WARN] VIX ingestion failed: {e}")
-
-    try:
-        fetch_vvix()
-    except Exception as e:
-        print(f"[WARN] VVIX ingestion failed: {e}")
-
-    print("=== Ingestion Complete ===")
-
-
-if __name__ == "__main__":
-    main()
+print("✅ SPY, ES, VIX, VVIX loaded into Snowflake successfully.")
