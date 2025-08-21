@@ -2,54 +2,31 @@
 # Runs daily forecast, ingests data, emails results
 
 stages:
-  - ingest
   - forecast
-  - deploy
+  - email
 
-# -----------------------
-# Stage 1: Data Ingestion
-# -----------------------
-daily_ingestion:
-  stage: ingest
+default:
   image: python:3.11-slim
   before_script:
     - pip install -r requirements.txt
-  script:
-    - python src/data_ingestion.py
-  artifacts:
-    paths:
-      - logs/
-    expire_in: 7 days
 
-# -----------------------
-# Stage 4: Forecast + Email
-# -----------------------
-stage4_forecast:
+forecast_job:
   stage: forecast
-  image: python:3.11-slim
-  before_script:
-    - pip install -r requirements.txt
   script:
     - python src/stage4_forecast.py
-    - python src/send_email.py
   artifacts:
     paths:
       - out/forecast.json
-    expire_in: 7 days
+    expire_in: 1 day
 
-# -----------------------
-# Stage 5: Deployment placeholder
-# -----------------------
-deploy_prod:
-  stage: deploy
-  image: alpine:latest
+email_job:
+  stage: email
+  needs: ["forecast_job"]
   script:
-    - echo "🚀 Deploying Zen Market AI…"
+    - python src/send_email.py
+  only:
+    - main
 
-# -----------------------
-# Trigger Rules
-# -----------------------
-# Run on pushes to main and on scheduled triggers
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'

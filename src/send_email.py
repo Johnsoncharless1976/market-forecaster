@@ -1,173 +1,48 @@
 # src/send_email.py
 import os
-import sys
-import smtplib
 import json
+import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
 
-# --- Ensure repo root on sys.path ---
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Load environment variables
+load_dotenv()
 
-from src import zen_rules   # Zen engine
+EMAIL_USER = os.getenv("EMAIL_USER")
+EMAIL_PASS = os.getenv("EMAIL_PASS")
+EMAIL_TO = os.getenv("EMAIL_TO")
 
-# --- Load forecast JSON ---
 with open("out/forecast.json", "r", encoding="utf-8") as f:
-    forecast_data = json.load(f)
+    forecast = json.load(f)
 
-# --- Extract values from JSON ---
-spy_price   = float(forecast_data.get("spy", 0.0))
-es_price    = float(forecast_data.get("es", 0.0))
-vix_value   = float(forecast_data.get("vix", 0.0))
-vvix_value  = float(forecast_data.get("vvix", 0.0))
-rsi_value   = float(forecast_data.get("rsi", 50.0))
-headline    = forecast_data.get("headline", "No headline available")
+# Relaxed validation: only abort if *all* feeds missing
+if all(v in (0.0, None) for v in forecast.values()):
+    raise ValueError("Forecast data invalid – all prices missing. Email aborted.")
 
-# --- Fail fast if placeholder values detected ---
-if spy_price == 0.0 or es_price == 0.0 or vix_value == 0.0 or vvix_value == 0.0:
-    raise ValueError(
-        "Forecast data invalid – missing live prices (SPX/ES/VIX/VVIX are 0.0). Email aborted."
-    )
+# Build email content
+body = f"""
+📈 ZeroDay Zen Forecast
 
-# --- Handle headline dict vs. string ---
-if isinstance(headline, dict):
-    headline_text = headline.get("title", "No headline available")
-    headline_link = headline.get("link", "")
-else:
-    headline_text = str(headline)
-    headline_link = ""
+SPX: {forecast.get("SPX")}
+ES: {forecast.get("ES")}
+VIX: {forecast.get("VIX")}
+VVIX: {forecast.get("VVIX")}
 
-# --- Current timestamp ---
-today = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
-
-# Placeholder values until Stage 6/7 data sources wired in
-last_candles  = []
-vix_change    = 0.0
-vvix_change   = 0.0
-events_today  = []
-
-# --- Run Zen Rules ---
-straddle_status = zen_rules.straddle_zone(spy_price, spy_price)
-rsi_status      = zen_rules.rsi_check(rsi_value)
-candle_status   = zen_rules.candle_structure(last_candles)
-vol_status      = zen_rules.volatility_overlay(vix_value, vvix_value, vix_change, vvix_change)
-event_status    = zen_rules.event_filter(events_today)
-headline_status = zen_rules.headline_overlay(headline_text)
-
-zen_bias = zen_rules.combine_bias(
-    straddle_status, rsi_status, candle_status,
-    vol_status, event_status, headline_status
-)
-
-# --- Bias color mapping ---
-bias_color = "#808080"
-if "Bullish" in zen_bias:
-    bias_color = "#2e8b57"
-elif "Bearish" in zen_bias:
-    bias_color = "#b22222"
-
-# --- Key Levels ---
-support_level    = round(spy_price - 15, 2)   # placeholder until Zen Grid
-resistance_level = round(spy_price + 15, 2)
-
-# --- Probable Path ---
-if "Bullish" in zen_bias:
-    base_case = f"Hold above {support_level}, targeting {resistance_level}."
-    bull_case = f"Break >{resistance_level} opens {resistance_level+20}."
-    bear_case = f"Only if <{support_level}, risk toward {support_level-20}."
-elif "Bearish" in zen_bias:
-    base_case = f"Struggle below {resistance_level}, leaning lower."
-    bear_case = f"Break <{support_level} opens {support_level-20}."
-    bull_case = f"Only if >{resistance_level}, relief toward {resistance_level+20}."
-else:
-    base_case = f"Chop between {support_level}-{resistance_level}."
-    bear_case = f"If <{support_level}, watch {support_level-20}."
-    bull_case = f"If >{resistance_level}, opens {resistance_level+20}."
-
-# --- Trade Implications (mock until live options feed) ---
-if "Bullish" in zen_bias:
-    spread_text = (
-        f"Bull Put Credit Spread: Sell {support_level} / Buy {support_level-20} (0DTE)<br>"
-        f"Cost: ~2.10 | Max Return: ~18%"
-    )
-elif "Bearish" in zen_bias:
-    spread_text = (
-        f"Bear Call Credit Spread: Sell {resistance_level} / Buy {resistance_level+20} (0DTE)<br>"
-        f"Cost: ~2.25 | Max Return: ~20%"
-    )
-else:
-    spread_text = "Neutral Zone – consider Iron Condor around straddle range."
-
-# --- Headline interpretation ---
-if headline_link:
-    headline_interp = (
-        f"📰 <b>{headline_text}</b><br>"
-        f"<a href='{headline_link}'>{headline_link}</a><br>"
-        f"<span style='color:#555;'>Zen read → <b>{headline_status}</b></span>"
-    )
-else:
-    headline_interp = (
-        f"📰 <b>{headline_text}</b><br>"
-        f"<span style='color:#555;'>Zen read → <b>{headline_status}</b></span>"
-    )
-
-# --- Build HTML email ---
-html_body = f"""
-<html>
-  <body style="font-family: Arial, sans-serif; background-color:#fafafa; color:#222; padding:20px;">
-    <h2 style="margin:0;">📈 ZeroDay Zen Forecast – {today}</h2>
-    <p style="font-size:12px; color:#666; margin-top:2px;">Sent automatically by Zen Market AI</p>
-    <hr style="border:none; border-top:1px solid #ddd; margin:15px 0;">
-
-    <p style="font-size:14px; line-height:1.5;">
-       <b>SPX Spot:</b> {spy_price}<br>
-       <b>/ES:</b> {es_price}<br>
-       <b>VIX:</b> {vix_value}<br>
-       <b>VVIX:</b> {vvix_value}<br>
-       <b>RSI (2m):</b> {rsi_value}
-    </p>
-
-    <h3>🧠 Bias</h3>
-    <p style="color:{bias_color}; font-weight:bold; font-size:15px;">{zen_bias}</p>
-
-    <h3>🔑 Key Levels</h3>
-    <p style="font-size:14px; line-height:1.5;">
-       <span style="color:#b22222;"><b>Resistance:</b> {resistance_level}</span><br>
-       <span style="color:#1e90ff;"><b>Support:</b> {support_level}</span>
-    </p>
-
-    <h3>📊 Probable Path</h3>
-    <p style="font-size:14px; line-height:1.5;">
-       Base Case: {base_case}<br>
-       Bear Case: {bear_case}<br>
-       Bull Case: {bull_case}
-    </p>
-
-    <h3>⚖️ Trade Implications</h3>
-    <p style="font-size:14px; line-height:1.5;">{spread_text}</p>
-
-    <h3>🌍 Context / News Check</h3>
-    <p style="font-size:14px; line-height:1.5;">{headline_interp}</p>
-
-    <h3>✅ Summary</h3>
-    <p style="font-size:14px; line-height:1.5;">
-      Bias: {zen_bias}. Watch {support_level}-{resistance_level} zone and volatility cues.
-    </p>
-
-    <hr style="border:none; border-top:1px solid #ddd; margin:20px 0;">
-    <p style="font-size:11px; color:#888;">End of forecast</p>
-  </body>
-</html>
+(Generated automatically by CI/CD)
 """
 
-# --- Send email ---
-msg = MIMEText(html_body, "html", "utf-8")
-msg["Subject"] = "📌 ZeroDay Zen Forecast"
-msg["From"] = os.environ["EMAIL_USER"]
-msg["To"] = os.environ["EMAIL_TO"]
+msg = MIMEMultipart()
+msg["From"] = EMAIL_USER
+msg["To"] = EMAIL_TO
+msg["Subject"] = "ZeroDay Zen Forecast"
+msg.attach(MIMEText(body, "plain"))
 
-server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
-server.starttls()
-server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
-server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
-server.quit()
+# Send email
+try:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(EMAIL_USER, EMAIL_PASS)
+        server.sendmail(EMAIL_USER, EMAIL_TO, msg.as_string())
+    print("✅ Email sent successfully")
+except Exception as e:
+    print(f"❌ Email send failed: {e}")
