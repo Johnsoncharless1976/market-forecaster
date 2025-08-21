@@ -33,8 +33,8 @@ stage4_forecast:
   before_script:
     - pip install -r requirements.txt
   script:
-    - python src/stage4_forecast.py
-    - python src/send_email.py
+  - python -m src.stage4_forecast
+  - python -m src.send_email
   artifacts:
     paths:
       - out/forecast.json

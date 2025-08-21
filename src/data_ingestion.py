@@ -1,9 +1,14 @@
 # src/data_ingestion.py
+import os
+import sys
 import requests
 import snowflake.connector
-import pandas as pd
-import yfinance as yf
 from datetime import date
+import yfinance as yf
+
+# --- Ensure repo root on sys.path ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 API_KEY = "jYeR6QVhnmhFe7V0aQm1_ZuGM6QawAEO"
 

@@ -1,10 +1,15 @@
 # src/send_email.py
 import os
+import sys
 import smtplib
 import json
 from email.mime.text import MIMEText
 from datetime import datetime
-from src import zen_rules   # << Zen engine
+
+# --- Ensure repo root on sys.path ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src import zen_rules   # Zen engine
 
 # --- Load forecast JSON ---
 with open("out/forecast.json", "r", encoding="utf-8") as f:
@@ -16,6 +21,7 @@ es_price    = float(forecast_data.get("es", 0.0))
 vix_value   = float(forecast_data.get("vix", 0.0))
 vvix_value  = float(forecast_data.get("vvix", 0.0))
 rsi_value   = float(forecast_data.get("rsi", 50.0))
+headline    = forecast_data.get("headline", "No headline available")
 
 # --- Fail fast if placeholder values detected ---
 if spy_price == 0.0 or es_price == 0.0 or vix_value == 0.0 or vvix_value == 0.0:
@@ -23,13 +29,12 @@ if spy_price == 0.0 or es_price == 0.0 or vix_value == 0.0 or vvix_value == 0.0:
         "Forecast data invalid – missing live prices (SPX/ES/VIX/VVIX are 0.0). Email aborted."
     )
 
-# Handle headline dict vs. string
-headline_data = forecast_data.get("headline", {})
-if isinstance(headline_data, dict):
-    headline_text = headline_data.get("title", "No headline available")
-    headline_link = headline_data.get("link", "")
+# --- Handle headline dict vs. string ---
+if isinstance(headline, dict):
+    headline_text = headline.get("title", "No headline available")
+    headline_link = headline.get("link", "")
 else:
-    headline_text = str(headline_data)
+    headline_text = str(headline)
     headline_link = ""
 
 # --- Current timestamp ---
@@ -118,7 +123,8 @@ html_body = f"""
        <b>SPX Spot:</b> {spy_price}<br>
        <b>/ES:</b> {es_price}<br>
        <b>VIX:</b> {vix_value}<br>
-       <b>VVIX:</b> {vvix_value}
+       <b>VVIX:</b> {vvix_value}<br>
+       <b>RSI (2m):</b> {rsi_value}
     </p>
 
     <h3>🧠 Bias</h3>
@@ -161,9 +167,7 @@ msg["From"] = os.environ["EMAIL_USER"]
 msg["To"] = os.environ["EMAIL_TO"]
 
 server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
-try:
-    server.starttls()
-    server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
-    server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
-finally:
-    server.quit()
+server.starttls()
+server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
+server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
+server.quit()

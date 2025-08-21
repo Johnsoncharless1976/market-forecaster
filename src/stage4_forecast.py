@@ -1,9 +1,13 @@
-import yfinance as yf
 import os
-import pandas as pd
+import sys
 import json
-import requests
 from datetime import datetime
+
+# --- Ensure repo root on sys.path ---
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src import zen_rules
+
 
 
 
