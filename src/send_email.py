@@ -1,45 +1,43 @@
 # src/send_email.py
 import os
 import smtplib
-from datetime import datetime
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
-EMAIL_TO = os.getenv("EMAIL_TO")
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+def send_email(subject: str, body: str):
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    email_user = os.getenv("EMAIL_USER")
+    email_pass = os.getenv("EMAIL_PASS")
+    email_to = os.getenv("EMAIL_TO")
 
-if not EMAIL_USER or not EMAIL_PASS or not EMAIL_TO:
-    raise ValueError("❌ Missing email configuration variables")
+    # Build the email container
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = email_user
+    msg["To"] = email_to
 
-# Format subject line with timestamp
-now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
-subject = f"📈 ZeroDay Zen Forecast – {now}"
+    # Wrap plain text fallback
+    text_version = body
 
-msg = MIMEMultipart()
-msg["From"] = EMAIL_USER
-msg["To"] = EMAIL_TO
-msg["Subject"] = subject
+    # 🔥 HTML version for Gmail (exact look)
+    html_version = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">
+      <h2>📌 ZeroDay Zen Forecast</h2>
+      {body.replace("\n", "<br>")}
+    </body>
+    </html>
+    """
 
-body = ""
-forecast_file = "forecast_output.txt"
-if os.path.exists(forecast_file):
-    with open(forecast_file, "r") as f:
-        body = f.read()
-else:
-    body = "(⚠️ No forecast generated)"
+    # Attach both
+    msg.attach(MIMEText(text_version, "plain"))
+    msg.attach(MIMEText(html_version, "html"))
 
-msg.attach(MIMEText(body, "plain"))
-
-try:
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+    # Send
+    with smtplib.SMTP(smtp_server, smtp_port) as server:
         server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, EMAIL_TO.split(","), msg.as_string())
-    print("✅ Email sent successfully")
-except Exception as e:
-    print("❌ Email send failed:", str(e))
-    raise
+        server.login(email_user, email_pass)
+        server.sendmail(email_user, email_to, msg.as_string())
 
+    print("✅ Email sent successfully!")

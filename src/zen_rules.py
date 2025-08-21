@@ -1,74 +1,69 @@
 # src/zen_rules.py
-import datetime
+from datetime import datetime
 
-def bias_logic(spx, vix, vvix):
-    if spx is None or vix is None:
-        return "Neutral"
+def generate_forecast(spx: float, es: float, vix: float, vvix: float = None) -> str:
+    """
+    Build a fully formatted HTML forecast email body.
+    Matches the exact style (emojis, bold, spacing, colored text).
+    """
 
-    if vix > 20:
-        return "Cautious / Bearish"
-    elif vix < 14:
-        return "Bullish"
-    return "Neutral"
+    now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+    vvix_display = vvix if vvix is not None else "N/A"
 
-def key_levels(spx):
-    if spx is None:
-        return {"Resistance": None, "Support": None}
+    # Hardcoded example logic — replace with your real analysis
+    bias = "Neutral"
+    resistance = 652.23
+    support = 622.23
+    base_case = f"Chop between {support}-{resistance}."
+    bear_case = f"If &lt;{support}, watch {support-20}."
+    bull_case = f"If &gt;{resistance}, opens {resistance+20}."
+    news_title = "Markets steady ahead of Powell speech"
+    news_link = "https://www.reuters.com/markets/"
+    news_comment = "Zen read → noise"
+    summary = f"Bias: {bias}. Watch {support}-{resistance} zone and volatility cues."
 
-    res = round(spx * 1.025, 2)
-    sup = round(spx * 0.975, 2)
-    return {"Resistance": res, "Support": sup}
+    # HTML Body
+    html = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">
 
-def probable_path(spx, levels):
-    if spx is None:
-        return "Base Case: Data unavailable"
+    <h2>📌 ZeroDay Zen Forecast</h2>
 
-    return (
-        f"Base Case: Chop between {levels['Support']}-{levels['Resistance']}.\n"
-        f"Bear Case: If <{levels['Support']}, watch {round(levels['Support']*0.97,2)}.\n"
-        f"Bull Case: If >{levels['Resistance']}, opens {round(levels['Resistance']*1.03,2)}."
-    )
+    <h3>📈 ZeroDay Zen Forecast – {now}</h3>
+    <p><em>Sent automatically by Zen Market AI</em></p>
+    <hr>
 
-def trade_implications(bias):
-    if "Bullish" in bias:
-        return "Favor bull credit spreads or debit call spreads."
-    elif "Bearish" in bias:
-        return "Favor bear credit spreads or debit put spreads."
-    else:
-        return "Neutral Zone – consider Iron Condor around straddle range."
+    <p><b>SPX Spot:</b> {spx}<br>
+    <b>/ES:</b> {es}<br>
+    <b>VIX:</b> {vix}<br>
+    <b>VVIX:</b> {vvix_display}</p>
 
-def news_context():
-    # Placeholder for future scraper integration
-    return "📰 Markets steady ahead of Powell speech\nhttps://www.reuters.com/markets/\nZen read → noise"
+    <h3>🧠 Bias</h3>
+    <p>{bias}</p>
 
-# 🔑 Main entry point
-def generate_forecast(data: dict) -> str:
-    spx = data.get("SPX")
-    es = data.get("ES")
-    vix = data.get("VIX")
-    vvix = data.get("VVIX")
+    <h3>🔑 Key Levels</h3>
+    <p><b><span style="color:red;">Resistance:</span></b> {resistance}<br>
+    <b><span style="color:blue;">Support:</span></b> {support}</p>
 
-    bias = bias_logic(spx, vix, vvix)
-    levels = key_levels(spx)
-    path = probable_path(spx, levels)
-    trades = trade_implications(bias)
-    news = news_context()
+    <h3>📊 Probable Path</h3>
+    <p>Base Case: {base_case}<br>
+    Bear Case: {bear_case}<br>
+    Bull Case: {bull_case}</p>
 
-    text = []
-    text.append(f"SPX Spot: {spx}")
-    text.append(f"/ES: {es}")
-    text.append(f"VIX: {vix}")
-    text.append(f"VVIX: {vvix}\n")
-    text.append("🧠 Bias")
-    text.append(bias + "\n")
-    text.append("🔑 Key Levels")
-    text.append(f"Resistance: {levels['Resistance']}")
-    text.append(f"Support: {levels['Support']}\n")
-    text.append("📊 Probable Path")
-    text.append(path + "\n")
-    text.append("⚖️ Trade Implications")
-    text.append(trades + "\n")
-    text.append("🌍 Context / News Check")
-    text.append(news)
+    <h3>⚖️ Trade Implications</h3>
+    <p>Neutral Zone – consider Iron Condor around straddle range.</p>
 
-    return "\n".join(text)
+    <h3>🌍 Context / News Check</h3>
+    <p><b>📰 {news_title}</b><br>
+    <a href="{news_link}">{news_link}</a><br>
+    {news_comment}</p>
+
+    <h3>✅ Summary</h3>
+    <p>{summary}</p>
+
+    <p style="color:gray; font-size:12px;">End of forecast</p>
+    </body>
+    </html>
+    """
+
+    return html
