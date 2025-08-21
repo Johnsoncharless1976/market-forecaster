@@ -20,11 +20,17 @@ SNOWFLAKE_ACCOUNT = "<YOUR_SNOWFLAKE_ACCOUNT>.snowflakecomputing.com"
 def get_spy():
     url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
     resp = requests.get(url).json()
+    
+    # Debug check
+    if "results" not in resp:
+        raise ValueError(f"Polygon API error: {resp}")
+    
     data = [{
         "DATE": pd.to_datetime(resp["results"][0]["t"], unit="ms").date(),
         "CLOSE": resp["results"][0]["c"]
     }]
     return pd.DataFrame(data)
+
 
 # Yahoo Finance (ES, VIX, VVIX)
 def get_yahoo(symbol, lookback="5d"):
