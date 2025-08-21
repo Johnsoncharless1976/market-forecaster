@@ -36,7 +36,7 @@ stage4_forecast:
     - pip install -r requirements.txt
   script:
     - python src/stage4_forecast.py
-    - python src/send_email.py
+    - python -m src.send_email
   needs: ["stage3_ingest"]   # ✅ ensures fresh data first
   artifacts:
     paths:
