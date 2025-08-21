@@ -11,22 +11,14 @@ forecast_job:
   script:
     - pip install -r requirements.txt
 
-    # Permanent discovery logs
+    # Permanent discovery logs for visibility
     - echo "📂 Contents of src/:"
     - ls -l src/ || echo "⚠️ src/ folder missing"
-
     - echo "📂 All Python files in repository:"
     - find . -type f -name "*.py" -print
 
-    # Run forecast script (adjust this to correct file name once seen in logs)
-    - if [ -f src/zen_forecast.py ]; then
-        python src/zen_forecast.py > forecast_output.txt;
-      elif [ -f src/forecast.py ]; then
-        python src/forecast.py > forecast_output.txt;
-      else
-        echo "⚠️ No forecast script found, creating placeholder output.";
-        echo "No forecast generated." > forecast_output.txt;
-      fi
+    # Always run the known good forecast script
+    - python src/forecast.py > forecast_output.txt
   artifacts:
     paths:
       - forecast_output.txt
