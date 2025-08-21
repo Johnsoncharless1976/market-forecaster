@@ -3,31 +3,25 @@
 
 stages:
   - forecast
-  - email
-
-default:
-  image: python:3.11-slim
-  before_script:
-    - pip install -r requirements.txt
+  - notify
 
 forecast_job:
   stage: forecast
+  image: python:3.11-slim
   script:
-    - python src/stage4_forecast.py
+    - pip install -r requirements.txt
+    - python src/forecast.py > forecast_output.txt
   artifacts:
     paths:
-      - out/forecast.json
-    expire_in: 1 day
+      - forecast_output.txt
 
-email_job:
-  stage: email
-  needs: ["forecast_job"]
+send_email_job:
+  stage: notify
+  image: python:3.11-slim
+  dependencies:
+    - forecast_job
   script:
+    - pip install -r requirements.txt
     - python src/send_email.py
   only:
     - main
-
-workflow:
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
