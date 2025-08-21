@@ -1,56 +1,73 @@
 # src/data_ingestion.py
+import os
 import requests
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
+import yfinance as yf
 
 # -----------------------------
-# 1. API Keys / Config
+# 1. Load secrets from GitLab CI/CD variables
 # -----------------------------
-POLYGON_API_KEY = "<YOUR_POLYGON_KEY>"  # already on file with me
-SNOWFLAKE_USER = "<YOUR_SNOWFLAKE_USER>"
-SNOWFLAKE_PASSWORD = "<YOUR_SNOWFLAKE_PASSWORD>"
-SNOWFLAKE_ACCOUNT = "<YOUR_SNOWFLAKE_ACCOUNT>.snowflakecomputing.com"
+POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
 
 # -----------------------------
 # 2. Data Fetch Functions
 # -----------------------------
 
-# SPY (Polygon)
+# SPY (Polygon fallback → Yahoo)
 def get_spy():
-    url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
-    resp = requests.get(url).json()
-    
-    # Debug check
-    if "results" not in resp:
-        raise ValueError(f"Polygon API error: {resp}")
-    
-    data = [{
-        "DATE": pd.to_datetime(resp["results"][0]["t"], unit="ms").date(),
-        "CLOSE": resp["results"][0]["c"]
-    }]
-    return pd.DataFrame(data)
+    if POLYGON_API_KEY:
+        url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
+        resp = requests.get(url).json()
+        if "results" in resp:
+            return pd.DataFrame([{
+                "DATE": pd.to_datetime(resp["results"][0]["t"], unit="ms").date(),
+                "CLOSE": resp["results"][0]["c"]
+            }])
+        else:
+            print(f"⚠️ Polygon failed: {resp} — falling back to Yahoo")
+    # Yahoo fallback
+    df = yf.download("SPY", period="5d", interval="1d")
+    df = df.reset_index()[["Date", "Close"]]
+    df.rename(columns={"Date": "DATE", "Close": "CLOSE"}, inplace=True)
+    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
+    return df.tail(1)  # just latest row
 
+# ES Futures (Yahoo)
+def get_es():
+    df = yf.download("ES=F", period="5d", interval="1d")
+    df = df.reset_index()[["Date", "Close"]]
+    df.rename(columns={"Date": "DATE", "Close": "CLOSE"}, inplace=True)
+    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
+    return df.tail(1)
 
-# Yahoo Finance (ES, VIX, VVIX)
-def get_yahoo(symbol, lookback="5d"):
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range={lookback}"
-    resp = requests.get(url).json()["chart"]["result"][0]
-    timestamps = resp["timestamp"]
-    closes = resp["indicators"]["quote"][0]["close"]
-    df = pd.DataFrame({
-        "DATE": pd.to_datetime(timestamps, unit="s").date,
-        "CLOSE": closes
-    })
-    return df.dropna()
+# VIX (Yahoo)
+def get_vix():
+    df = yf.download("^VIX", period="5d", interval="1d")
+    df = df.reset_index()[["Date", "Close"]]
+    df.rename(columns={"Date": "DATE", "Close": "CLOSE"}, inplace=True)
+    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
+    return df.tail(1)
+
+# VVIX (Yahoo)
+def get_vvix():
+    df = yf.download("^VVIX", period="5d", interval="1d")
+    df = df.reset_index()[["Date", "Close"]]
+    df.rename(columns={"Date": "DATE", "Close": "CLOSE"}, inplace=True)
+    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
+    return df.tail(1)
 
 # -----------------------------
 # 3. Fetch Data
 # -----------------------------
 spy_df = get_spy()
-es_df = get_yahoo("ES=F")      # S&P 500 E-mini futures
-vix_df = get_yahoo("^VIX")
-vvix_df = get_yahoo("^VVIX")
+es_df = get_es()
+vix_df = get_vix()
+vvix_df = get_vvix()
 
 # -----------------------------
 # 4. Connect to Snowflake
