@@ -10,6 +10,7 @@ forecast_job:
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
+    # Run the correct forecast script
     - python src/zen_forecast.py > forecast_output.txt
   artifacts:
     paths:
