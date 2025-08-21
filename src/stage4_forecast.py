@@ -4,6 +4,7 @@ import json
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
+from zen_rules import generate_forecast   # 🔑 import Zen logic
 
 os.makedirs("out", exist_ok=True)
 
@@ -25,8 +26,7 @@ def fetch_vvix():
     try:
         vvix_df = pd.read_csv("data/VVIX_History.csv")
         return float(vvix_df["VVIX"].iloc[-1])
-    except Exception as e:
-        print(f"⚠️ Warning: VVIX fetch failed ({e}), using None.")
+    except Exception:
         return None
 
 if __name__ == "__main__":
@@ -35,25 +35,27 @@ if __name__ == "__main__":
     vix_val = fetch_vix()
     vvix_val = fetch_vvix()
 
-    forecast = {
+    forecast_data = {
         "SPX": spy_val,
         "ES": es_val,
         "VIX": vix_val,
         "VVIX": vvix_val
     }
 
-    # Write JSON output
+    # Write JSON (structured data)
     with open("out/forecast.json", "w", encoding="utf-8") as f:
-        json.dump(forecast, f, indent=2)
+        json.dump(forecast_data, f, indent=2)
 
-    # Write text output for emailer
+    # Use Zen Rules to generate the polished text
+    zen_text = generate_forecast(forecast_data)
+
+    # Add header with timestamp
     now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+    header = f"📈 ZeroDay Zen Forecast – {now}\nSent automatically by Zen Market AI\n\n"
+    email_body = header + zen_text
+
+    # Write to email file
     with open("forecast_output.txt", "w", encoding="utf-8") as f:
-        f.write(f"📈 ZeroDay Zen Forecast – {now}\n")
-        f.write("Sent automatically by Zen Market AI\n\n")
-        f.write(f"SPX Spot: {spy_val}\n")
-        f.write(f"/ES: {es_val}\n")
-        f.write(f"VIX: {vix_val}\n")
-        f.write(f"VVIX: {vvix_val}\n")
+        f.write(email_body)
 
     print("✅ Forecast written to out/forecast.json and forecast_output.txt")
