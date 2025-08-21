@@ -1,5 +1,5 @@
 # GitLab CI configuration for Zen Market AI
-# Runs daily ingestion, forecast, email, and deployment
+# Runs daily forecast, ingests data, emails results
 
 stages:
   - ingest
@@ -7,7 +7,7 @@ stages:
   - deploy
 
 # -----------------------
-# Stage 1: Daily Ingestion
+# Stage 1: Data Ingestion
 # -----------------------
 daily_ingestion:
   stage: ingest
@@ -18,14 +18,11 @@ daily_ingestion:
     - python src/data_ingestion.py
   artifacts:
     paths:
-      - out/ingest.log
-    expire_in: 30 days
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - when: manual
+      - logs/
+    expire_in: 7 days
 
 # -----------------------
-# Stage 2: Forecast + Email
+# Stage 4: Forecast + Email
 # -----------------------
 stage4_forecast:
   stage: forecast
@@ -33,26 +30,27 @@ stage4_forecast:
   before_script:
     - pip install -r requirements.txt
   script:
-  - python -m src.stage4_forecast
-  - python -m src.send_email
+    - python src/stage4_forecast.py
+    - python src/send_email.py
   artifacts:
     paths:
       - out/forecast.json
-      - out/forecast.txt
     expire_in: 7 days
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - when: manual
 
 # -----------------------
-# Stage 3: Deployment
+# Stage 5: Deployment placeholder
 # -----------------------
 deploy_prod:
   stage: deploy
   image: alpine:latest
   script:
-    - echo "🚀 Deploying Zen Market AI application..."
-  only:
-    - main
+    - echo "🚀 Deploying Zen Market AI…"
 
-
+# -----------------------
+# Trigger Rules
+# -----------------------
+# Run on pushes to main and on scheduled triggers
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
