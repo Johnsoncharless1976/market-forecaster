@@ -15,18 +15,20 @@ def insert_to_snowflake(table, date_val, close_val):
     conn = get_snowflake_connection()
     cur = conn.cursor()
     try:
-        query = f"""
-            INSERT INTO {table} (DATE, CLOSE)
-            VALUES (%s, %s)
-        """
+        query = f"INSERT INTO {table} (DATE, CLOSE) VALUES (%s, %s)"
         cur.execute(query, (date_val, close_val))
+        rowcount = cur.rowcount
         conn.commit()
-        print(f"[OK] {table}: {date_val} = {close_val}")
+        if rowcount == 1:
+            print(f"[OK] {table}: {date_val} = {close_val}")
+        else:
+            print(f"[WARN] {table}: No row inserted (maybe duplicate?)")
     except Exception as e:
         print(f"[ERR] Failed inserting into {table}: {e}")
     finally:
         cur.close()
         conn.close()
+
 
 
 # =============== SPY via Polygon ==================
