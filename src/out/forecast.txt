@@ -1,7 +1,7 @@
-SPY: 635.34
-ES: 6389.0
-VIX: 16.53
+SPY: 636.82
+ES: 6403.25
+VIX: 16.14
 VVIX: 98.6
-RSI: 50.04
+RSI: 40.28
 Bias: Neutral
 Headline: Markets steady ahead of Powell speech

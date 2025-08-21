@@ -1,8 +1,14 @@
 import yfinance as yf
+import os
 import pandas as pd
 import json
 import requests
 from datetime import datetime
+
+
+
+# ensure out/ folder exists
+os.makedirs("out", exist_ok=True)
 
 # --- Fetch live prices using Yahoo Finance ---
 def get_price(ticker):
