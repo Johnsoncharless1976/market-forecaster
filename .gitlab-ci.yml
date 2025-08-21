@@ -1,15 +1,21 @@
+# GitLab CI configuration for Zen Market AI
+# Runs daily ingestion, forecast, email, and deployment
+
 stages:
   - ingest
   - forecast
   - deploy
 
+# -----------------------
+# Stage 1: Daily Ingestion
+# -----------------------
 daily_ingestion:
   stage: ingest
   image: python:3.11-slim
   before_script:
     - pip install -r requirements.txt
   script:
-    - python src/data_ingestion.py   # ✅ Proper list item
+    - python src/data_ingestion.py
   artifacts:
     paths:
       - out/ingest.log
@@ -18,7 +24,9 @@ daily_ingestion:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - when: manual
 
-
+# -----------------------
+# Stage 2: Forecast + Email
+# -----------------------
 stage4_forecast:
   stage: forecast
   image: python:3.11-slim
@@ -27,28 +35,23 @@ stage4_forecast:
   script:
     - python src/stage4_forecast.py
     - python src/send_email.py
-    - python src/log_time.py --hours 0.25 --notes "CI job ran: stage4_forecast"
   artifacts:
     paths:
       - out/forecast.json
       - out/forecast.txt
-      - project_time_log.md
-    expire_in: 30 days
+    expire_in: 7 days
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: always
     - when: manual
 
+# -----------------------
+# Stage 3: Deployment
+# -----------------------
 deploy_prod:
   stage: deploy
   image: alpine:latest
   script:
-    - echo "Deploying application…"
-    - python src/log_time.py --hours 0.1 --notes "CI job ran: deploy_prod"
-  artifacts:
-    paths:
-      - project_time_log.md
-    expire_in: 30 days
+    - echo "🚀 Deploying Zen Market AI application..."
   only:
     - main
 
