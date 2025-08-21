@@ -1,60 +1,69 @@
 # src/zen_rules.py
 from datetime import datetime
 
-def generate_forecast(spx, es, vix, vvix):
-    now = datetime.datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+def generate_forecast(spx: float, es: float, vix: float, vvix: float = None) -> str:
+    """
+    Build a fully formatted HTML forecast email body.
+    Matches the exact style (emojis, bold, spacing, colored text).
+    """
 
-    body_html = f"""
+    now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+    vvix_display = vvix if vvix is not None else "N/A"
+
+    # Hardcoded example logic — replace with your real analysis
+    bias = "Neutral"
+    resistance = 652.23
+    support = 622.23
+    base_case = f"Chop between {support}-{resistance}."
+    bear_case = f"If &lt;{support}, watch {support-20}."
+    bull_case = f"If &gt;{resistance}, opens {resistance+20}."
+    news_title = "Markets steady ahead of Powell speech"
+    news_link = "https://www.reuters.com/markets/"
+    news_comment = "Zen read → noise"
+    summary = f"Bias: {bias}. Watch {support}-{resistance} zone and volatility cues."
+
+    # HTML Body
+    html = f"""
     <html>
-      <head>
-        <style>
-          body {{
-            font-family: Arial, Helvetica, sans-serif;
-            font-size: 16px;   /* ⬅️ bumped up from 14px */
-            line-height: 1.6;
-            color: #111;
-          }}
-          h1, h2 {{
-            font-size: 20px;   /* ⬅️ bumped up from 18px */
-          }}
-          .summary {{
-            font-weight: bold;
-            color: #2d862d;   /* green for summary */
-          }}
-        </style>
-      </head>
-      <body>
-        <h2>📌 ZeroDay Zen Forecast – {now}</h2>
-        <p><b>SPX Spot:</b> {spx}<br>
-        <b>/ES:</b> {es}<br>
-        <b>VIX:</b> {vix}<br>
-        <b>VVIX:</b> {vvix if vvix else "N/A"}</p>
+    <body style="font-family: Arial, sans-serif; font-size: 16px; line-height: 1.6;">
 
-        <h3>🧠 Bias</h3>
-        <p>Neutral</p>
+    <h2>📌 ZeroDay Zen Forecast</h2>
 
-        <h3>🔑 Key Levels</h3>
-        <p>Resistance: {spx + 15:.2f}<br>
-        Support: {spx - 15:.2f}</p>
+    <h3>📈 ZeroDay Zen Forecast – {now}</h3>
+    <p><em>Sent automatically by Zen Market AI</em></p>
+    <hr>
 
-        <h3>📊 Probable Path</h3>
-        <p>Base Case: Chop between {spx - 15:.2f}–{spx + 15:.2f}.<br>
-        Bear Case: If &lt;{spx - 15:.2f}, watch {spx - 35:.2f}.<br>
-        Bull Case: If &gt;{spx + 15:.2f}, opens {spx + 35:.2f}.</p>
+    <p><b>SPX Spot:</b> {spx}<br>
+    <b>/ES:</b> {es}<br>
+    <b>VIX:</b> {vix}<br>
+    <b>VVIX:</b> {vvix_display}</p>
 
-        <h3>⚖️ Trade Implications</h3>
-        <p>Neutral Zone – consider Iron Condor around straddle range.</p>
+    <h3>🧠 Bias</h3>
+    <p>{bias}</p>
 
-        <h3>🌍 Context / News Check</h3>
-        <p>📰 Markets steady ahead of Powell speech<br>
-        <a href="https://www.reuters.com/markets/">https://www.reuters.com/markets/</a><br>
-        Zen read → noise</p>
+    <h3>🔑 Key Levels</h3>
+    <p><b><span style="color:red;">Resistance:</span></b> {resistance}<br>
+    <b><span style="color:blue;">Support:</span></b> {support}</p>
 
-        <p class="summary">✅ Summary<br>
-        Bias: Neutral. Watch {spx - 15:.2f}–{spx + 15:.2f} zone and volatility cues.</p>
+    <h3>📊 Probable Path</h3>
+    <p>Base Case: {base_case}<br>
+    Bear Case: {bear_case}<br>
+    Bull Case: {bull_case}</p>
 
-        <p><i>End of forecast</i></p>
-      </body>
+    <h3>⚖️ Trade Implications</h3>
+    <p>Neutral Zone – consider Iron Condor around straddle range.</p>
+
+    <h3>🌍 Context / News Check</h3>
+    <p><b>📰 {news_title}</b><br>
+    <a href="{news_link}">{news_link}</a><br>
+    {news_comment}</p>
+
+    <h3>✅ Summary</h3>
+    <p>{summary}</p>
+
+    <p style="color:gray; font-size:12px;">End of forecast</p>
+    </body>
     </html>
     """
-    return body_html
+
+    return html
