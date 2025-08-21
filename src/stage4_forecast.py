@@ -4,7 +4,7 @@ import json
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
-from zen_rules import generate_forecast   # 🔑 import Zen logic
+from zen_rules import generate_forecast   # Zen forecast logic
 
 os.makedirs("out", exist_ok=True)
 
@@ -42,20 +42,31 @@ if __name__ == "__main__":
         "VVIX": vvix_val
     }
 
-    # Write JSON (structured data)
+    # Save raw JSON
     with open("out/forecast.json", "w", encoding="utf-8") as f:
         json.dump(forecast_data, f, indent=2)
 
-    # Use Zen Rules to generate the polished text
+    # Build Zen Forecast body
     zen_text = generate_forecast(forecast_data)
 
-    # Add header with timestamp
+    # Timestamp
     now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
-    header = f"📈 ZeroDay Zen Forecast – {now}\nSent automatically by Zen Market AI\n\n"
-    email_body = header + zen_text
 
-    # Write to email file
+    # Assemble final email
+    email_body = (
+        "📌 ZeroDay Zen Forecast \n"  # 📌 thumbtack header
+        f"📈 ZeroDay Zen Forecast – {now}\n"
+        "Sent automatically by Zen Market AI\n\n"
+        f"{zen_text}\n\n"
+        "✅ Summary\n"
+        f"Bias: {zen_text.split('🧠 Bias')[1].splitlines()[1].strip()}. "
+        f"Watch {zen_text.split('Support: ')[1].splitlines()[0]}-"
+        f"{zen_text.split('Resistance: ')[1].splitlines()[0]} zone and volatility cues.\n\n"
+        "End of forecast"
+    )
+
     with open("forecast_output.txt", "w", encoding="utf-8") as f:
         f.write(email_body)
 
     print("✅ Forecast written to out/forecast.json and forecast_output.txt")
+
