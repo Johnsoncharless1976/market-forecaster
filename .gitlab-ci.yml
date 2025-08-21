@@ -9,16 +9,15 @@ daily_ingestion:
   before_script:
     - pip install -r requirements.txt
   script:
-    - python src/data_ingestion.py
-    - python src/log_time.py --hours 0.25 --notes "CI job ran: daily_ingestion"
+    - python src/data_ingestion.py   # ✅ Proper list item
   artifacts:
     paths:
-      - project_time_log.md
+      - out/ingest.log
     expire_in: 30 days
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-      when: always
     - when: manual
+
 
 stage4_forecast:
   stage: forecast
