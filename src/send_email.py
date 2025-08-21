@@ -1,48 +1,65 @@
 # src/send_email.py
-import os
-import json
 import smtplib
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from dotenv import load_dotenv
+from datetime import datetime
 
-# Load environment variables
-load_dotenv()
+# Example market data (replace with Snowflake or API fetch)
+spx = 635.4600219726562
+es = 6388.25
+vix = 16.780000686645508
+vvix = None
 
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASS = os.getenv("EMAIL_PASS")
-EMAIL_TO = os.getenv("EMAIL_TO")
+# Format numbers
+spx_fmt = f"{spx:.2f}"
+es_fmt = f"{es:.2f}"
+vix_fmt = f"{vix:.2f}"
+vvix_fmt = f"{vvix:.1f}" if vvix else "N/A"
 
-with open("out/forecast.json", "r", encoding="utf-8") as f:
-    forecast = json.load(f)
+# Timestamp
+now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
 
-# Relaxed validation: only abort if *all* feeds missing
-if all(v in (0.0, None) for v in forecast.values()):
-    raise ValueError("Forecast data invalid – all prices missing. Email aborted.")
+# Email body (Zen style)
+body = f"""📈 ZeroDay Zen Forecast – {now}
+Sent automatically by Zen Market AI
 
-# Build email content
-body = f"""
-📈 ZeroDay Zen Forecast
+SPX Spot: {spx_fmt}
+/ES: {es_fmt}
+VIX: {vix_fmt}
+VVIX: {vvix_fmt}
 
-SPX: {forecast.get("SPX")}
-ES: {forecast.get("ES")}
-VIX: {forecast.get("VIX")}
-VVIX: {forecast.get("VVIX")}
+🧠 Bias
+Neutral
 
-(Generated automatically by CI/CD)
+🔑 Key Levels
+Resistance: {float(spx_fmt) + 15:.2f}
+Support: {float(spx_fmt) - 15:.2f}
+
+📊 Probable Path
+Base Case: Chop between {float(spx_fmt) - 15:.2f}-{float(spx_fmt) + 15:.2f}.
+Bear Case: If <{float(spx_fmt) - 15:.2f}, watch {float(spx_fmt) - 35:.2f}.
+Bull Case: If >{float(spx_fmt) + 15:.2f}, opens {float(spx_fmt) + 35:.2f}.
+
+⚖️ Trade Implications
+Neutral Zone – consider Iron Condor around straddle range.
+
+🌍 Context / News Check
+📰 Markets steady ahead of Powell speech
+https://www.reuters.com/markets/
+Zen read → noise
+
+✅ Summary
+Bias: Neutral. Watch {float(spx_fmt) - 15:.2f}-{float(spx_fmt) + 15:.2f} zone and volatility cues.
 """
 
-msg = MIMEMultipart()
-msg["From"] = EMAIL_USER
-msg["To"] = EMAIL_TO
-msg["Subject"] = "ZeroDay Zen Forecast"
-msg.attach(MIMEText(body, "plain"))
+msg = MIMEText(body, "plain")
+msg["Subject"] = "📈 ZeroDay Zen Forecast"
+msg["From"] = "zenmarketai@gmail.com"
+msg["To"] = "youremail@domain.com"
 
-# Send email
-try:
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, EMAIL_TO, msg.as_string())
-    print("✅ Email sent successfully")
-except Exception as e:
-    print(f"❌ Email send failed: {e}")
+# Send (adjust SMTP settings for Gmail or SES)
+with smtplib.SMTP("smtp.gmail.com", 587) as server:
+    server.starttls()
+    server.login("zenmarketai@gmail.com", "YOUR_APP_PASSWORD")
+    server.sendmail(msg["From"], [msg["To"]], msg.as_string())
+
+print("✅ Email sent successfully")
