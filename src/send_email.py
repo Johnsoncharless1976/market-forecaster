@@ -16,6 +16,14 @@ es_price    = float(forecast_data.get("es", 0.0))
 vix_value   = float(forecast_data.get("vix", 0.0))
 vvix_value  = float(forecast_data.get("vvix", 0.0))
 rsi_value   = float(forecast_data.get("rsi", 50.0))
+headline    = forecast_data.get("headline", "No headline available")
+
+# --- Fail fast if placeholder values detected ---
+if spy_price == 0.0 or es_price == 0.0 or vix_value == 0.0 or vvix_value == 0.0:
+    raise ValueError(
+        "Forecast data invalid – missing live prices (SPX/ES/VIX/VVIX are 0.0). Email aborted."
+    )
+
 
 # Handle headline dict vs. string
 headline_data = forecast_data.get("headline", {})
@@ -90,12 +98,16 @@ else:
 # --- Headline interpretation ---
 if headline_link:
     headline_interp = (
-        f"📰 {headline_text}<br>"
+        f"📰 <b>{headline_text}</b><br>"
         f"<a href='{headline_link}'>{headline_link}</a><br>"
-        f"<i>Zen read: {headline_status}</i>"
+        f"<span style='color:#555;'>Zen read → <b>{headline_status}</b></span>"
     )
 else:
-    headline_interp = f"📰 {headline_text}<br><i>Zen read: {headline_status}</i>"
+    headline_interp = (
+        f"📰 <b>{headline_text}</b><br>"
+        f"<span style='color:#555;'>Zen read → <b>{headline_status}</b></span>"
+    )
+
 
 # --- Build HTML email ---
 html_body = f"""
@@ -152,7 +164,10 @@ msg["From"] = os.environ["EMAIL_USER"]
 msg["To"] = os.environ["EMAIL_TO"]
 
 server = smtplib.SMTP(os.environ["SMTP_SERVER"], int(os.environ["SMTP_PORT"]))
-server.starttls()
-server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
-server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
-server.quit()
+try:
+    server.starttls()
+    server.login(os.environ["EMAIL_USER"], os.environ["EMAIL_PASS"])
+    server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
+finally:
+    server.quit()
+

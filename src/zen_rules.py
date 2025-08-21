@@ -85,27 +85,48 @@ def event_filter(events: list) -> str:
 def headline_overlay(headline) -> str:
     """
     Classify headline sentiment.
-    Accepts either a string or dict (with "title" field).
-    Always returns a classification string.
+    Accepts:
+      - string
+      - dict {"title": str, "link": str}
+    Uses both title and link context if available.
+    Returns: classification string.
     """
-    # Normalize headline to text
+    text = ""
+    link = ""
+
+    # Normalize headline
     if isinstance(headline, dict):
         text = str(headline.get("title", ""))
+        link = str(headline.get("link", ""))
     else:
         text = str(headline)
 
-    text = text.lower()
+    # Lowercase both for easier matching
+    text_l = text.lower()
+    link_l = link.lower()
 
-    if any(word in text for word in ["hawkish", "tightening", "yields spike", "inflation hot"]):
+    # --- Classification rules ---
+    # Hawkish / bearish monetary tone
+    if any(w in text_l for w in ["hawkish", "tightening", "yields spike", "inflation hot"]) \
+       or "fed" in link_l or "fomc" in link_l:
         return "hawkish"
-    elif any(word in text for word in ["rally", "bullish", "optimism", "strong earnings"]):
+
+    # Bullish / optimism
+    if any(w in text_l for w in ["rally", "bullish", "optimism", "strong earnings"]) \
+       or "earnings" in link_l:
         return "bullish"
-    elif any(word in text for word in ["geopolitical", "war", "default", "risk-off", "fear"]):
+
+    # Risk-off / fear / geopolitical
+    if any(w in text_l for w in ["geopolitical", "war", "default", "risk-off", "fear"]) \
+       or "geopolitics" in link_l or "conflict" in link_l:
         return "risk-off"
-    elif text.strip() == "":
+
+    # Nothing meaningful
+    if text.strip() == "":
         return "noise"
-    else:
-        return "noise"
+
+    return "noise"
+
 
 
 # --- Combine All ---
