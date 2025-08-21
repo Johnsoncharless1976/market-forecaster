@@ -3,9 +3,8 @@ import os
 import json
 import yfinance as yf
 import pandas as pd
-import requests
+from datetime import datetime
 
-# Ensure output folder exists
 os.makedirs("out", exist_ok=True)
 
 def fetch_spy():
@@ -43,7 +42,18 @@ if __name__ == "__main__":
         "VVIX": vvix_val
     }
 
+    # Write JSON output
     with open("out/forecast.json", "w", encoding="utf-8") as f:
         json.dump(forecast, f, indent=2)
 
-    print("✅ Forecast written to out/forecast.json")
+    # Write text output for emailer
+    now = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
+    with open("forecast_output.txt", "w", encoding="utf-8") as f:
+        f.write(f"📈 ZeroDay Zen Forecast – {now}\n")
+        f.write("Sent automatically by Zen Market AI\n\n")
+        f.write(f"SPX Spot: {spy_val}\n")
+        f.write(f"/ES: {es_val}\n")
+        f.write(f"VIX: {vix_val}\n")
+        f.write(f"VVIX: {vvix_val}\n")
+
+    print("✅ Forecast written to out/forecast.json and forecast_output.txt")

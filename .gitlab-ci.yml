@@ -10,18 +10,12 @@ forecast_job:
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
-
-    # Permanent discovery logs for visibility
-    - echo "📂 Contents of src/:"
-    - ls -l src/ || echo "⚠️ src/ folder missing"
-    - echo "📂 All Python files in repository:"
-    - find . -type f -name "*.py" -print
-
-    # Always run the known good forecast script
-    - python src/forecast.py > forecast_output.txt
+    - python src/stage4_forecast.py
   artifacts:
     paths:
       - forecast_output.txt
+      - out/forecast.json
+
 
 send_email_job:
   stage: notify
