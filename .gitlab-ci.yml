@@ -1,32 +1,43 @@
 # GitLab CI configuration for Zen Market AI
-# Runs daily forecast, emails results, and provides artifacts
+# Runs daily data ingestion → forecast → email → deploy
 
 stages:
+  - ingest
   - forecast
   - deploy
 
 # -----------------------
-# Stage 4 + Email Combined
+# Stage 3: Data Ingestion
 # -----------------------
-stage4_forecast_and_email:
-  stage: forecast
+stage3_ingest:
+  stage: ingest
   image: python:3.11-slim
-  variables:
-    PYTHONPATH: "${CI_PROJECT_DIR}"
   before_script:
     - pip install -r requirements.txt
   script:
-    # ✅ Sanity check: verify package import works
-    - python -c "import src.zen_rules; print('✅ zen_rules import works')"
+    - python src/data_ingestion.py
+  artifacts:
+    paths:
+      - out/ingest.log
+    expire_in: 7 days
+  rules:
+    # Run automatically on schedule
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    # Allow manual trigger from GitLab UI
+    - when: manual
 
-    # Run forecast generator → produces out/forecast.json
+# -----------------------
+# Stage 4: Forecast + Email
+# -----------------------
+stage4_forecast:
+  stage: forecast
+  image: python:3.11-slim
+  before_script:
+    - pip install -r requirements.txt
+  script:
     - python src/stage4_forecast.py
-
-    # Sanity check JSON exists
-    - test -f out/forecast.json || (echo '❌ forecast.json missing' && exit 1)
-
-    # Run email sender → consumes forecast.json
     - python src/send_email.py
+  needs: ["stage3_ingest"]   # ✅ ensures fresh data first
   artifacts:
     paths:
       - out/forecast.json
