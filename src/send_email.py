@@ -42,13 +42,16 @@ html_body = f"""
     </p>
     <hr style="border:none; border-top:1px solid #ddd; margin:15px 0;">
 
-    <p><b>SPX Spot:</b> {spy_line.replace("SPY:", "").strip()}<br>
-       <b>/MES:</b> {es_line.replace("ES:", "").strip()}<br>
-       <b>VIX:</b> {vix_line.replace("VIX:", "").strip()}<br>
-       <b>VVIX:</b> {vvix_line.replace("VVIX:", "").strip()}</p>
+    <!-- Bump info font size -->
+    <p style="font-size:14px; line-height:1.5;">
+      <b>SPX Spot:</b> {spy_line.replace("SPY:", "").strip()}<br>
+      <b>/MES:</b> {es_line.replace("ES:", "").strip()}<br>
+      <b>VIX:</b> {vix_line.replace("VIX:", "").strip()}<br>
+      <b>VVIX:</b> {vvix_line.replace("VVIX:", "").strip()}
+    </p>
 
     <h3>🔍 Technical & Volatility Structure</h3>
-    <p>
+    <p style="font-size:14px; line-height:1.5;">
       {spy_line}<br>
       {es_line}<br>
       {vix_line} / {vvix_line}
@@ -60,28 +63,28 @@ html_body = f"""
     </p>
 
     <h3>🔑 Key Levels</h3>
-    <p>
+    <p style="font-size:14px; line-height:1.5;">
       Resistance: (auto-filled soon)<br>
       Support: (auto-filled soon)
     </p>
 
     <h3>📊 Probable Path</h3>
-    <p>
+    <p style="font-size:14px; line-height:1.5;">
       Base Case: (auto-filled soon)<br>
       Bear Case: (auto-filled soon)<br>
       Bull Case: (auto-filled soon)
     </p>
 
     <h3>⚖️ Trade Implications</h3>
-    <p>
+    <p style="font-size:14px; line-height:1.5;">
       (contextual notes will be populated from Stage 6+)
     </p>
 
     <h3>🌍 Context / News Check</h3>
-    <p>{headline}</p>
+    <p style="font-size:14px; line-height:1.5;">{headline}</p>
 
     <h3>✅ Summary</h3>
-    <p>
+    <p style="font-size:14px; line-height:1.5;">
       {bias_line}. Watch SPX key levels and VIX for confirmation.
     </p>
 
@@ -90,6 +93,7 @@ html_body = f"""
   </body>
 </html>
 """
+
 
 # --- Send email ---
 msg = MIMEText(html_body, "html", "utf-8")
