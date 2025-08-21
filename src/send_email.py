@@ -1,43 +1,38 @@
 # src/send_email.py
-import os
+
 import smtplib
+import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-def send_email(subject: str, body: str):
-    smtp_server = os.getenv("SMTP_SERVER")
-    smtp_port = int(os.getenv("SMTP_PORT", 587))
-    email_user = os.getenv("EMAIL_USER")
-    email_pass = os.getenv("EMAIL_PASS")
-    email_to = os.getenv("EMAIL_TO")
 
-    # Build the email container
+def send_email(subject, body_html):
+    sender = os.environ.get("EMAIL_USER")
+    recipient = os.environ.get("EMAIL_TO")
+    password = os.environ.get("EMAIL_PASS")
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+
+    if not all([sender, recipient, password]):
+        raise RuntimeError("❌ Missing one or more required email environment variables.")
+
+    # Create MIME message
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = email_user
-    msg["To"] = email_to
+    msg["From"] = sender
+    msg["To"] = recipient
 
-    # Wrap plain text fallback
-    text_version = body
+    # Wrap plain text (fallback) + HTML
+    plain_text = "This email requires HTML support. Please view in a modern email client."
 
-    # 🔥 HTML version for Gmail (exact look)
-    html_version = f"""
-    <html>
-    <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6;">
-      <h2>📌 ZeroDay Zen Forecast</h2>
-      {body.replace("\n", "<br>")}
-    </body>
-    </html>
-    """
+    msg.attach(MIMEText(plain_text, "plain"))
+    msg.attach(MIMEText(body_html, "html"))
 
-    # Attach both
-    msg.attach(MIMEText(text_version, "plain"))
-    msg.attach(MIMEText(html_version, "html"))
-
-    # Send
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(email_user, email_pass)
-        server.sendmail(email_user, email_to, msg.as_string())
-
-    print("✅ Email sent successfully!")
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(sender, password)
+            server.sendmail(sender, [recipient], msg.as_string())
+        print("[EMAIL] ✅ Forecast email sent successfully.")
+    except Exception as e:
+        print(f"[EMAIL] ❌ Failed to send email: {e}")
