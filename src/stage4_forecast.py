@@ -1,12 +1,16 @@
+# src/stage4_forecast.py
 import os
 import sys
 import json
+import yfinance as yf
+import pandas as pd
 from datetime import datetime
 
-# --- Ensure repo root on sys.path ---
+# Ensure repo root on sys.path (so send_email.py and zen_rules.py import cleanly)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src import zen_rules
+
 
 
 
