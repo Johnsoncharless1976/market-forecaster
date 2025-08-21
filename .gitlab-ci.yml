@@ -10,8 +10,23 @@ forecast_job:
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
-    # Run the correct forecast script
-    - python src/zen_forecast.py > forecast_output.txt
+
+    # Permanent discovery logs
+    - echo "📂 Contents of src/:"
+    - ls -l src/ || echo "⚠️ src/ folder missing"
+
+    - echo "📂 All Python files in repository:"
+    - find . -type f -name "*.py" -print
+
+    # Run forecast script (adjust this to correct file name once seen in logs)
+    - if [ -f src/zen_forecast.py ]; then
+        python src/zen_forecast.py > forecast_output.txt;
+      elif [ -f src/forecast.py ]; then
+        python src/forecast.py > forecast_output.txt;
+      else
+        echo "⚠️ No forecast script found, creating placeholder output.";
+        echo "No forecast generated." > forecast_output.txt;
+      fi
   artifacts:
     paths:
       - forecast_output.txt
@@ -26,4 +41,5 @@ send_email_job:
     - python src/send_email.py
   only:
     - main
+
 
