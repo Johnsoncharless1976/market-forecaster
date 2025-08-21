@@ -10,7 +10,7 @@ forecast_job:
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
-    - python src/forecast.py > forecast_output.txt
+    - python src/zen_forecast.py > forecast_output.txt
   artifacts:
     paths:
       - forecast_output.txt
@@ -25,3 +25,4 @@ send_email_job:
     - python src/send_email.py
   only:
     - main
+
