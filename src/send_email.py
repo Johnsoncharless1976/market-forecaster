@@ -16,14 +16,12 @@ es_price    = float(forecast_data.get("es", 0.0))
 vix_value   = float(forecast_data.get("vix", 0.0))
 vvix_value  = float(forecast_data.get("vvix", 0.0))
 rsi_value   = float(forecast_data.get("rsi", 50.0))
-headline    = forecast_data.get("headline", "No headline available")
 
 # --- Fail fast if placeholder values detected ---
 if spy_price == 0.0 or es_price == 0.0 or vix_value == 0.0 or vvix_value == 0.0:
     raise ValueError(
         "Forecast data invalid – missing live prices (SPX/ES/VIX/VVIX are 0.0). Email aborted."
     )
-
 
 # Handle headline dict vs. string
 headline_data = forecast_data.get("headline", {})
@@ -108,7 +106,6 @@ else:
         f"<span style='color:#555;'>Zen read → <b>{headline_status}</b></span>"
     )
 
-
 # --- Build HTML email ---
 html_body = f"""
 <html>
@@ -170,4 +167,3 @@ try:
     server.sendmail(os.environ["EMAIL_USER"], [os.environ["EMAIL_TO"]], msg.as_string())
 finally:
     server.quit()
-
