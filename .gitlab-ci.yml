@@ -11,6 +11,8 @@ stages:
 stage4_forecast:
   stage: forecast
   image: python:3.11-slim
+  variables:
+    PYTHONPATH: "${CI_PROJECT_DIR}/src"
   before_script:
     # Install Python dependencies
     - pip install -r requirements.txt
