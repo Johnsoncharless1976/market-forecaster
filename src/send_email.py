@@ -1,46 +1,17 @@
-# ============================================
-# File: send_email.py
-# Commit Notes:
-# - [2025-08-22] Restored full SMTP email block (fix: emails not sending)
-# - [2025-08-22] Adjusted body format: removed "Spot", kept first 📌 pin only
-# ============================================
+# ----------------------------------------
+# Commit Notes: send_email.py
+# Purpose: Stand up forecast email skeleton
+# Status: Placeholders only (no Snowflake logic yet)
+# ----------------------------------------
 
+import os
+import smtplib
 from datetime import datetime
 import pytz
-import pandas as pd
-import snowflake.connector
-import os
-from dotenv import load_dotenv
-import smtplib
 from email.mime.text import MIMEText
+from dotenv import load_dotenv
 
 load_dotenv()
-
-# -----------------------------
-# Snowflake connection
-# -----------------------------
-conn = snowflake.connector.connect(
-    user=os.getenv("SNOWFLAKE_USER"),
-    password=os.getenv("SNOWFLAKE_PASSWORD"),
-    account=os.getenv("SNOWFLAKE_ACCOUNT"),
-    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-    database=os.getenv("SNOWFLAKE_DATABASE"),
-    schema=os.getenv("SNOWFLAKE_SCHEMA"),
-)
-
-def fetch_latest(conn, table):
-    with conn.cursor() as cur:
-        cur.execute(f"SELECT DATE, CLOSE FROM {table} ORDER BY DATE DESC LIMIT 1")
-        row = cur.fetchone()
-        if not row or row[1] is None:
-            return "--"
-        return round(float(row[1]), 2)
-
-spx_val = fetch_latest(conn, "SPX_HISTORICAL")
-es_val = fetch_latest(conn, "ES_HISTORICAL")
-vix_val = fetch_latest(conn, "VIX_HISTORICAL")
-vvix_val = fetch_latest(conn, "VVIX_HISTORICAL")
-conn.close()
 
 # -----------------------------
 # Timestamp (Eastern)
@@ -50,15 +21,40 @@ now_et = datetime.now(eastern)
 formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 
 # -----------------------------
-# Email body
+# Placeholder values
+# (to be replaced later by Zen Council)
+# -----------------------------
+SPX = "####"
+ES = "####"
+VIX = "##.##"
+VVIX = "##.##"
+BIAS = "Neutral Bias Placeholder"
+TECHNICAL = "Support/Resistance Placeholder"
+CONTEXT = "Context/News Placeholder"
+TRADE = "Trade Setup Placeholder"
+
+# -----------------------------
+# Email body (Zen Forecast style)
 # -----------------------------
 email_body = f"""
 📈 ZeroDay Zen Forecast – {formatted_time}
 
-📌 SPX: {spx_val}
-/ES: {es_val}
-VIX: {vix_val}
-VVIX: {vvix_val}
+SPX: {SPX}
+/ES: {ES}
+VIX: {VIX}
+VVIX: {VVIX}
+
+🧠 Bias  
+{BIAS}
+
+🔍 Technical & Volatility Structure  
+{TECHNICAL}
+
+🌐 Context & Headlines  
+{CONTEXT}
+
+📊 Trade Setups (0DTE / 1DTE)  
+{TRADE}
 """
 
 # -----------------------------
@@ -76,4 +72,9 @@ def send_email(body):
 
     print(f"📨 Email sent to {msg['To']}")
 
-send_email(email_body)
+# -----------------------------
+# Main
+# -----------------------------
+if __name__ == "__main__":
+    print(email_body)
+    send_email(email_body)
