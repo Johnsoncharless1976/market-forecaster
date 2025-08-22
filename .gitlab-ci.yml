@@ -19,6 +19,7 @@ send_forecast:
   image: python:3.11-slim
   script:
     - pip install -r requirements.txt
-    - python send_email.py
+    - python src/send_email.py
   only:
     - main
+
