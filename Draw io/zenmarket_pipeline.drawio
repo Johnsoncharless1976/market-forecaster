@@ -1,0 +1,31 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36" version="28.1.1">
+  <diagram id="ZenMarketPipeline" name="ZenMarket Pipeline">
+    <mxGraphModel dx="872" dy="431" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="📥 Data Ingestion Script&#xa;(Python)&#xa;- Fetches SPX, ES, VIX, VVIX from Yahoo Finance&#xa;- Normalizes and cleans data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="110" y="30" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="3" value="❄️ Snowflake Database&#xa;- Stores 5y historical backfill&#xa;- Stores daily updates&#xa;- Tables: SPX_HISTORICAL, ES_HISTORICAL, VIX_HISTORICAL, VVIX_HISTORICAL" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="500" y="100" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="4" value="🧠 Brain Logic (Stage 4 / Council)&#xa;- Pulls latest + historical from Snowflake&#xa;- Applies ML / rules engine&#xa;- Interprets volatility, trend, support/resistance&#xa;- Generates forecast insights" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="100" y="300" width="320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="5" value="📧 Email Delivery Script&#xa;(Python)&#xa;- Formats forecast template&#xa;- Inserts placeholders (SPX, ES, VIX, VVIX, forecast notes)&#xa;- Sends via Gmail SMTP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="500" y="320" width="320" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" parent="1" source="2" target="3" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" parent="1" source="3" target="4" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" parent="1" source="4" target="5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
