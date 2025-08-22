@@ -6,6 +6,8 @@ import pandas as pd
 import snowflake.connector
 import os
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
 
 load_dotenv()
 
@@ -22,6 +24,7 @@ conn = snowflake.connector.connect(
 )
 
 def fetch_latest(conn, table):
+    """Fetch most recent CLOSE from a table, rounded to 2 decimals."""
     with conn.cursor() as cur:
         cur.execute(f"SELECT DATE, CLOSE FROM {table} ORDER BY DATE DESC LIMIT 1")
         row = cur.fetchone()
@@ -43,7 +46,7 @@ now_et = datetime.now(eastern)
 formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 
 # -----------------------------
-# Email body (same format you had)
+# Email body
 # -----------------------------
 email_body = f"""
 📈 ZeroDay Zen Forecast – {formatted_time}
@@ -54,4 +57,20 @@ VIX: {vix_val}
 VVIX: {vvix_val}
 """
 
-print(email_body)
+# -----------------------------
+# Send Email (via Gmail SMTP)
+# -----------------------------
+def send_email(body):
+    msg = MIMEText(body, "plain")
+    msg["Subject"] = "ZeroDay Zen Forecast"
+    msg["From"] = os.getenv("EMAIL_USER")
+    msg["To"] = os.getenv("EMAIL_TO")
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(os.getenv("EMAIL_USER"), os.getenv("EMAIL_PASS"))
+        server.send_message(msg)
+
+    print(f"📨 Email sent to {msg['To']}")
+
+# Run send
+send_email(email_body)
