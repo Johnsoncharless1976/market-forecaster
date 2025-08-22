@@ -1,7 +1,13 @@
-# src/send_email.py
+# ============================================
+# File: send_email.py
+# Commit Notes:
+# - [2025-08-22] Restored full SMTP email block (fix: emails not sending)
+# - [2025-08-22] Adjusted body format: removed "Spot", kept first 📌 pin only
+# ============================================
 
 from datetime import datetime
 import pytz
+import pandas as pd
 import snowflake.connector
 import os
 from dotenv import load_dotenv
@@ -44,19 +50,19 @@ now_et = datetime.now(eastern)
 formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 
 # -----------------------------
-# Email body (final format)
+# Email body
 # -----------------------------
 email_body = f"""
-📌 ZeroDay Zen Forecast – {formatted_time}
+📈 ZeroDay Zen Forecast – {formatted_time}
 
-SPX: {spx_val}
+📌 SPX: {spx_val}
 /ES: {es_val}
 VIX: {vix_val}
 VVIX: {vvix_val}
 """
 
 # -----------------------------
-# Send via Gmail SMTP
+# Send Email
 # -----------------------------
 def send_email(body):
     msg = MIMEText(body, "plain")
@@ -70,5 +76,4 @@ def send_email(body):
 
     print(f"📨 Email sent to {msg['To']}")
 
-# actually send
 send_email(email_body)
