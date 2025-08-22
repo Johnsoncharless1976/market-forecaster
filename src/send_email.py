@@ -2,12 +2,9 @@
 
 from datetime import datetime
 import pytz
-import pandas as pd
 import snowflake.connector
 import os
 from dotenv import load_dotenv
-import smtplib
-from email.mime.text import MIMEText
 
 load_dotenv()
 
@@ -24,7 +21,6 @@ conn = snowflake.connector.connect(
 )
 
 def fetch_latest(conn, table):
-    """Fetch most recent CLOSE from a table, rounded to 2 decimals."""
     with conn.cursor() as cur:
         cur.execute(f"SELECT DATE, CLOSE FROM {table} ORDER BY DATE DESC LIMIT 1")
         row = cur.fetchone()
@@ -49,28 +45,34 @@ formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 # Email body
 # -----------------------------
 email_body = f"""
-📈 ZeroDay Zen Forecast – {formatted_time}
+📌 ZeroDay Zen Forecast – {formatted_time}
 
-SPX Spot: {spx_val}
+SPX: {spx_val}
 /ES: {es_val}
 VIX: {vix_val}
 VVIX: {vvix_val}
+
+🎯 Bias
+Neutral
+
+🗝️ Key Levels
+Resistance: 6423.25
+Support: 6390.25
+
+📉 Probable Path
+Base Case: SPX → 6420–6425 zone
+Bear Case: < 6390 rejection
+Bull Case: if > 6425, can extend 20 pts
+
+💡 Trade Implications
+Neutral bias → consider Iron Condor around straddle range.
+
+📰 Context / News Check
+Markets steady ahead of Powell speech
+VIX / VVIX confirm calm conditions
+
+📊 Summary
+Bias: Neutral. Watch 6420–6425 zone and volatility cues.
 """
 
-# -----------------------------
-# Send Email (via Gmail SMTP)
-# -----------------------------
-def send_email(body):
-    msg = MIMEText(body, "plain")
-    msg["Subject"] = "ZeroDay Zen Forecast"
-    msg["From"] = os.getenv("EMAIL_USER")
-    msg["To"] = os.getenv("EMAIL_TO")
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(os.getenv("EMAIL_USER"), os.getenv("EMAIL_PASS"))
-        server.send_message(msg)
-
-    print(f"📨 Email sent to {msg['To']}")
-
-# Run send
-send_email(email_body)
+print(email_body)
