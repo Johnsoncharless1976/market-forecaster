@@ -1,23 +1,24 @@
 # GitLab CI configuration for Zen Market AI
 # Runs daily forecast, ingests data, emails results
 
-# .gitlab-ci.yml
 stages:
   - ingest
-
-variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_NO_CACHE_DIR: "1"
-
-before_script:
-  # Update pip and install dependencies
-  - python -m pip install --upgrade pip
-  - pip install -r requirements.txt
+  - email
 
 ingest_data:
   stage: ingest
   image: python:3.11-slim
   script:
+    - pip install -r requirements.txt
     - python src/data_ingestion.py
   only:
-    - main   # run only on the main branch
+    - main
+
+send_forecast:
+  stage: email
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python send_email.py
+  only:
+    - main
