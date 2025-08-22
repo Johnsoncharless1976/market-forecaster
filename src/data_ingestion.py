@@ -10,17 +10,28 @@ from dotenv import load_dotenv
 # -----------------------------
 # 1. Load environment variables
 # -----------------------------
-load_dotenv()
+load_dotenv()  # local use; in GitLab CI/CD vars are injected automatically
 
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
-conn = snowflake.connector.connect(
-    user=os.getenv("SNOWFLAKE_USER"),
-    password=os.getenv("SNOWFLAKE_PASSWORD"),
-    account=os.getenv("SNOWFLAKE_ACCOUNT"),  # no https://, no .snowflakecomputing.com
-    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-    database=os.getenv("SNOWFLAKE_DATABASE"),
-    schema=os.getenv("SNOWFLAKE_SCHEMA"),
-)
+
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+
+# Verify required values exist
+for var, value in {
+    "SNOWFLAKE_USER": SNOWFLAKE_USER,
+    "SNOWFLAKE_PASSWORD": SNOWFLAKE_PASSWORD,
+    "SNOWFLAKE_ACCOUNT": SNOWFLAKE_ACCOUNT,
+    "SNOWFLAKE_WAREHOUSE": SNOWFLAKE_WAREHOUSE,
+    "SNOWFLAKE_DATABASE": SNOWFLAKE_DATABASE,
+    "SNOWFLAKE_SCHEMA": SNOWFLAKE_SCHEMA,
+}.items():
+    if not value:
+        raise EnvironmentError(f"❌ Missing environment variable: {var}")
 
 # -----------------------------
 # 2. Helpers
@@ -33,31 +44,26 @@ def normalize_df(df):
     if df is None or df.empty:
         return pd.DataFrame(columns=["DATE", "CLOSE"])
 
-    # Flatten multi-index columns (if yfinance returns them)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = ["_".join([str(c) for c in col if c]) for col in df.columns]
 
     df = df.reset_index()
 
-    # Rename common yfinance column names
     rename_map = {}
     if "Date" in df.columns:
         rename_map["Date"] = "DATE"
     if "Close" in df.columns:
         rename_map["Close"] = "CLOSE"
     if "Close_" in "".join(df.columns):
-        # Handle multi-index column like ('Close','SPY')
         for c in df.columns:
             if "Close" in c:
                 rename_map[c] = "CLOSE"
 
     df.rename(columns=rename_map, inplace=True)
 
-    # Keep only DATE and CLOSE if they exist
     keep_cols = [c for c in ["DATE", "CLOSE"] if c in df.columns]
     df = df[keep_cols]
 
-    # Standardize types
     if "DATE" in df.columns:
         df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
     if "CLOSE" in df.columns:
@@ -66,12 +72,9 @@ def normalize_df(df):
     df = df.dropna()
     return df.tail(1)
 
-
 # -----------------------------
 # 3. Data fetch functions
 # -----------------------------
-
-# SPY (Polygon, with fallback to Yahoo)
 def get_spy():
     if POLYGON_API_KEY:
         url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
@@ -87,23 +90,47 @@ def get_spy():
     df = yf.download("SPY", period="5d", interval="1d")
     return normalize_df(df)
 
-# ES Futures (Yahoo)
 def get_es():
     df = yf.download("ES=F", period="5d", interval="1d")
     return normalize_df(df)
 
-# VIX (Yahoo)
 def get_vix():
     df = yf.download("^VIX", period="5d", interval="1d")
     return normalize_df(df)
 
-# VVIX (Yahoo)
 def get_vvix():
     df = yf.download("^VVIX", period="5d", interval="1d")
     return normalize_df(df)
 
 # -----------------------------
-# 4. Fetch data
+# 4. Deduplication helper
+# -----------------------------
+def upsert_daily(conn, df: pd.DataFrame, table_name: str):
+    """Delete existing row for today's DATE, then insert fresh row"""
+    if df.empty:
+        print(f"⚠️ No data to insert for {table_name}")
+        return
+
+    today = df["DATE"].iloc[-1]
+
+    with conn.cursor() as cur:
+        cur.execute(f"DELETE FROM {table_name} WHERE DATE = %s", (today,))
+        print(f"🧹 Removed existing rows for {today} in {table_name}")
+
+    write_pandas(conn, df.reset_index(drop=True), table_name)
+    print(f"✅ Inserted new row for {today} into {table_name}")
+
+def verify_table(conn, table_name: str):
+    """Print last 5 rows from a table for verification"""
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT * FROM {table_name} ORDER BY DATE DESC LIMIT 5")
+        rows = cur.fetchall()
+        print(f"\n📊 Last 5 rows in {table_name}:")
+        for row in rows:
+            print(row)
+
+# -----------------------------
+# 5. Fetch data
 # -----------------------------
 spy_df = get_spy()
 es_df = get_es()
@@ -117,28 +144,32 @@ print("VIX:", vix_df)
 print("VVIX:", vvix_df)
 
 # -----------------------------
-# 5. Connect to Snowflake
+# 6. Connect + load into Snowflake
 # -----------------------------
-if not SNOWFLAKE_ACCOUNT or not SNOWFLAKE_USER:
-    raise ValueError("❌ Missing Snowflake env vars. Check your .env or GitLab CI/CD settings.")
+try:
+    conn = snowflake.connector.connect(
+        user=SNOWFLAKE_USER,
+        password=SNOWFLAKE_PASSWORD,
+        account=SNOWFLAKE_ACCOUNT,
+        warehouse=SNOWFLAKE_WAREHOUSE,
+        database=SNOWFLAKE_DATABASE,
+        schema=SNOWFLAKE_SCHEMA,
+    )
+    print(f"✅ Connected to Snowflake account {SNOWFLAKE_ACCOUNT} as {SNOWFLAKE_USER}")
 
-print(f"🔎 Connecting to Snowflake account: {SNOWFLAKE_ACCOUNT}, user: {SNOWFLAKE_USER}")
+    upsert_daily(conn, spy_df, "SPY_HISTORICAL")
+    upsert_daily(conn, es_df, "ES_HISTORICAL")
+    upsert_daily(conn, vix_df, "VIX_HISTORICAL")
+    upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
 
-conn = snowflake.connector.connect(
-    user=SNOWFLAKE_USER,
-    password=SNOWFLAKE_PASSWORD,
-    account=SNOWFLAKE_ACCOUNT,
-    warehouse="COMPUTE_WH",
-    database="ZEN_MARKET",
-    schema="FORECASTING"
-)
+    verify_table(conn, "SPY_HISTORICAL")
+    verify_table(conn, "ES_HISTORICAL")
+    verify_table(conn, "VIX_HISTORICAL")
+    verify_table(conn, "VVIX_HISTORICAL")
 
-# -----------------------------
-# 6. Insert into Snowflake
-# -----------------------------
-write_pandas(conn, spy_df, "SPY_HISTORICAL")
-write_pandas(conn, es_df, "ES_HISTORICAL")
-write_pandas(conn, vix_df, "VIX_HISTORICAL")
-write_pandas(conn, vvix_df, "VVIX_HISTORICAL")
+    print("🎉 SPY, ES, VIX, VVIX upserted into Snowflake successfully.")
+    conn.close()
+except Exception as e:
+    print("❌ Snowflake load failed:", e)
+    raise
 
-print("🎉 SPY, ES, VIX, VVIX loaded into Snowflake successfully.")
