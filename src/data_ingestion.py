@@ -1,6 +1,6 @@
 # src/data_ingestion.py
+# src/data_ingestion.py
 import os
-import requests
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
@@ -10,9 +10,7 @@ from dotenv import load_dotenv
 # -----------------------------
 # 1. Load environment variables
 # -----------------------------
-load_dotenv()  # local use; in GitLab CI/CD vars are injected automatically
-
-POLYGON_API_KEY = os.getenv("POLYGON_API_KEY")
+load_dotenv()
 
 SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
 SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
@@ -36,81 +34,56 @@ for var, value in {
 # -----------------------------
 # 2. Helpers
 # -----------------------------
+def clean_columns(df):
+    """Flatten any multi-index columns so Snowflake sees clean names."""
+    df.columns = [
+        str(c[0]) if isinstance(c, tuple) else str(c)
+        for c in df.columns
+    ]
+    return df
+
 def normalize_df(df):
-    """
-    Normalize any DataFrame from yfinance or polygon
-    into 2 columns: DATE, CLOSE
-    """
+    """Normalize Yahoo Finance DataFrame into DATE, CLOSE with 2-decimal rounding"""
     if df is None or df.empty:
         return pd.DataFrame(columns=["DATE", "CLOSE"])
 
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = ["_".join([str(c) for c in col if c]) for col in df.columns]
-
     df = df.reset_index()
 
-    rename_map = {}
+    # Flatten column names if multi-index
+    df.columns = [c if not isinstance(c, tuple) else c[0] for c in df.columns]
+
+    # Rename properly
     if "Date" in df.columns:
-        rename_map["Date"] = "DATE"
+        df.rename(columns={"Date": "DATE"}, inplace=True)
     if "Close" in df.columns:
-        rename_map["Close"] = "CLOSE"
-    if "Close_" in "".join(df.columns):
-        for c in df.columns:
-            if "Close" in c:
-                rename_map[c] = "CLOSE"
+        df.rename(columns={"Close": "CLOSE"}, inplace=True)
 
-    df.rename(columns=rename_map, inplace=True)
+    df = df[["DATE", "CLOSE"]]
+    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
+    df["CLOSE"] = pd.to_numeric(df["CLOSE"], errors="coerce").round(2)  # 👈 round here
 
-    keep_cols = [c for c in ["DATE", "CLOSE"] if c in df.columns]
-    df = df[keep_cols]
+    return df.dropna().tail(1)
 
-    if "DATE" in df.columns:
-        df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
-    if "CLOSE" in df.columns:
-        df["CLOSE"] = pd.to_numeric(df["CLOSE"], errors="coerce")
 
-    df = df.dropna()
-    return df.tail(1)
-
-# -----------------------------
-# 3. Data fetch functions
-# -----------------------------
-def get_spy():
-    if POLYGON_API_KEY:
-        url = f"https://api.polygon.io/v2/aggs/ticker/SPY/prev?apiKey={POLYGON_API_KEY}"
-        resp = requests.get(url).json()
-        if "results" in resp:
-            df = pd.DataFrame([{
-                "DATE": pd.to_datetime(resp["results"][0]["t"], unit="ms").date(),
-                "CLOSE": resp["results"][0]["c"]
-            }])
-            return normalize_df(df)
-        else:
-            print(f"⚠️ Polygon SPY fetch failed: {resp} — using Yahoo fallback")
-    df = yf.download("SPY", period="5d", interval="1d")
-    return normalize_df(df)
+def get_spx():
+    return normalize_df(yf.download("^GSPC", period="5d", interval="1d"))
 
 def get_es():
-    df = yf.download("ES=F", period="5d", interval="1d")
-    return normalize_df(df)
+    return normalize_df(yf.download("ES=F", period="5d", interval="1d"))
 
 def get_vix():
-    df = yf.download("^VIX", period="5d", interval="1d")
-    return normalize_df(df)
+    return normalize_df(yf.download("^VIX", period="5d", interval="1d"))
 
 def get_vvix():
-    df = yf.download("^VVIX", period="5d", interval="1d")
-    return normalize_df(df)
+    return normalize_df(yf.download("^VVIX", period="5d", interval="1d"))
 
-# -----------------------------
-# 4. Deduplication helper
-# -----------------------------
 def upsert_daily(conn, df: pd.DataFrame, table_name: str):
     """Delete existing row for today's DATE, then insert fresh row"""
     if df.empty:
         print(f"⚠️ No data to insert for {table_name}")
         return
 
+    df = clean_columns(df)  # ensure clean column names
     today = df["DATE"].iloc[-1]
 
     with conn.cursor() as cur:
@@ -130,21 +103,21 @@ def verify_table(conn, table_name: str):
             print(row)
 
 # -----------------------------
-# 5. Fetch data
+# 3. Fetch data
 # -----------------------------
-spy_df = get_spy()
+spx_df = get_spx()
 es_df = get_es()
 vix_df = get_vix()
 vvix_df = get_vvix()
 
 print("✅ Data fetched:")
-print("SPY:", spy_df)
+print("SPX:", spx_df)
 print("ES:", es_df)
 print("VIX:", vix_df)
 print("VVIX:", vvix_df)
 
 # -----------------------------
-# 6. Connect + load into Snowflake
+# 4. Connect + load into Snowflake
 # -----------------------------
 try:
     conn = snowflake.connector.connect(
@@ -157,19 +130,18 @@ try:
     )
     print(f"✅ Connected to Snowflake account {SNOWFLAKE_ACCOUNT} as {SNOWFLAKE_USER}")
 
-    upsert_daily(conn, spy_df, "SPY_HISTORICAL")
+    upsert_daily(conn, spx_df, "SPX_HISTORICAL")
     upsert_daily(conn, es_df, "ES_HISTORICAL")
     upsert_daily(conn, vix_df, "VIX_HISTORICAL")
     upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
 
-    verify_table(conn, "SPY_HISTORICAL")
+    verify_table(conn, "SPX_HISTORICAL")
     verify_table(conn, "ES_HISTORICAL")
     verify_table(conn, "VIX_HISTORICAL")
     verify_table(conn, "VVIX_HISTORICAL")
 
-    print("🎉 SPY, ES, VIX, VVIX upserted into Snowflake successfully.")
+    print("🎉 SPX, ES, VIX, VVIX upserted into Snowflake successfully.")
     conn.close()
 except Exception as e:
     print("❌ Snowflake load failed:", e)
     raise
-
