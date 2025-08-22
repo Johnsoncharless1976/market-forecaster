@@ -5,6 +5,8 @@ import pytz
 import snowflake.connector
 import os
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
 
 load_dotenv()
 
@@ -42,7 +44,7 @@ now_et = datetime.now(eastern)
 formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 
 # -----------------------------
-# Email body
+# Email body (final format)
 # -----------------------------
 email_body = f"""
 📌 ZeroDay Zen Forecast – {formatted_time}
@@ -51,28 +53,22 @@ SPX: {spx_val}
 /ES: {es_val}
 VIX: {vix_val}
 VVIX: {vvix_val}
-
-🎯 Bias
-Neutral
-
-🗝️ Key Levels
-Resistance: 6423.25
-Support: 6390.25
-
-📉 Probable Path
-Base Case: SPX → 6420–6425 zone
-Bear Case: < 6390 rejection
-Bull Case: if > 6425, can extend 20 pts
-
-💡 Trade Implications
-Neutral bias → consider Iron Condor around straddle range.
-
-📰 Context / News Check
-Markets steady ahead of Powell speech
-VIX / VVIX confirm calm conditions
-
-📊 Summary
-Bias: Neutral. Watch 6420–6425 zone and volatility cues.
 """
 
-print(email_body)
+# -----------------------------
+# Send via Gmail SMTP
+# -----------------------------
+def send_email(body):
+    msg = MIMEText(body, "plain")
+    msg["Subject"] = "ZeroDay Zen Forecast"
+    msg["From"] = os.getenv("EMAIL_USER")
+    msg["To"] = os.getenv("EMAIL_TO")
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(os.getenv("EMAIL_USER"), os.getenv("EMAIL_PASS"))
+        server.send_message(msg)
+
+    print(f"📨 Email sent to {msg['To']}")
+
+# actually send
+send_email(email_body)
