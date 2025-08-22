@@ -1,38 +1,57 @@
 # src/send_email.py
 
-import smtplib
+from datetime import datetime
+import pytz
+import pandas as pd
+import snowflake.connector
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from dotenv import load_dotenv
 
+load_dotenv()
 
-def send_email(subject, body_html):
-    sender = os.environ.get("EMAIL_USER")
-    recipient = os.environ.get("EMAIL_TO")
-    password = os.environ.get("EMAIL_PASS")
-    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port = int(os.environ.get("SMTP_PORT", 587))
+# -----------------------------
+# Snowflake connection
+# -----------------------------
+conn = snowflake.connector.connect(
+    user=os.getenv("SNOWFLAKE_USER"),
+    password=os.getenv("SNOWFLAKE_PASSWORD"),
+    account=os.getenv("SNOWFLAKE_ACCOUNT"),
+    warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
+    database=os.getenv("SNOWFLAKE_DATABASE"),
+    schema=os.getenv("SNOWFLAKE_SCHEMA"),
+)
 
-    if not all([sender, recipient, password]):
-        raise RuntimeError("❌ Missing one or more required email environment variables.")
+def fetch_latest(conn, table):
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT DATE, CLOSE FROM {table} ORDER BY DATE DESC LIMIT 1")
+        row = cur.fetchone()
+        if not row or row[1] is None:
+            return "--"
+        return round(float(row[1]), 2)
 
-    # Create MIME message
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = recipient
+spx_val = fetch_latest(conn, "SPX_HISTORICAL")
+es_val = fetch_latest(conn, "ES_HISTORICAL")
+vix_val = fetch_latest(conn, "VIX_HISTORICAL")
+vvix_val = fetch_latest(conn, "VVIX_HISTORICAL")
+conn.close()
 
-    # Wrap plain text (fallback) + HTML
-    plain_text = "This email requires HTML support. Please view in a modern email client."
+# -----------------------------
+# Timestamp (Eastern)
+# -----------------------------
+eastern = pytz.timezone("US/Eastern")
+now_et = datetime.now(eastern)
+formatted_time = now_et.strftime("%b %d, %Y (%I:%M %p ET)")
 
-    msg.attach(MIMEText(plain_text, "plain"))
-    msg.attach(MIMEText(body_html, "html"))
+# -----------------------------
+# Email body (same format you had)
+# -----------------------------
+email_body = f"""
+📈 ZeroDay Zen Forecast – {formatted_time}
 
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(sender, password)
-            server.sendmail(sender, [recipient], msg.as_string())
-        print("[EMAIL] ✅ Forecast email sent successfully.")
-    except Exception as e:
-        print(f"[EMAIL] ❌ Failed to send email: {e}")
+SPX Spot: {spx_val}
+/ES: {es_val}
+VIX: {vix_val}
+VVIX: {vvix_val}
+"""
+
+print(email_body)
