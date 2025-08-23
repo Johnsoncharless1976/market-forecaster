@@ -1,15 +1,15 @@
 """
-Stage 1.1 + 1.2 – Daily OHLCV Ingestion with Monitoring (Polished)
-------------------------------------------------------------------
+Stage 1.3 – Daily OHLCV Ingestion with Monitoring & Alerting
+------------------------------------------------------------
 - Ingest SPX, ES, VIX, VVIX OHLCV daily from Yahoo Finance.
-- Deduplication-safe upsert: removes any overlap in date range before insert.
-- Verify pipeline health (schema, freshness, duplicates).
-- Log verification results into MONITORING_LOG table in Snowflake.
-- Patched Yahoo auto_adjust warning.
-- Patched datetime deprecation warning.
+- Deduplication-safe upsert: removes overlap in date range before insert.
+- Monitoring: schema, freshness, duplicates.
+- Logs monitoring results into MONITORING_LOG (Snowflake).
+- NEW: If any check = FAIL → raise exception and fail job, triggering CI/CD alert.
 """
 
 import os
+import sys
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
@@ -107,8 +107,9 @@ def log_monitoring(conn, table_name: str, check_type: str, status: str, details:
             VALUES ('{run_ts}', '{table_name}', '{check_type}', '{status}', '{details}')
         """)
 
-def run_monitoring(conn, table_name: str):
-    """Run freshness, duplicates, schema checks for a table and log results."""
+def run_monitoring(conn, table_name: str) -> bool:
+    """Run freshness, duplicates, schema checks for a table. Returns True if all OK, else False."""
+    table_ok = True
     try:
         with conn.cursor() as cur:
             # Freshness
@@ -118,6 +119,7 @@ def run_monitoring(conn, table_name: str):
                 log_monitoring(conn, table_name, "Freshness", "OK", f"Last date = {last_date}")
             else:
                 log_monitoring(conn, table_name, "Freshness", "FAIL", "No rows found")
+                table_ok = False
 
             # Duplicates
             cur.execute(f"""
@@ -130,6 +132,7 @@ def run_monitoring(conn, table_name: str):
                 log_monitoring(conn, table_name, "Duplicates", "OK")
             else:
                 log_monitoring(conn, table_name, "Duplicates", "FAIL", f"{dups} duplicate dates found")
+                table_ok = False
 
             # Schema
             cur.execute(f"DESC TABLE {table_name}")
@@ -139,9 +142,13 @@ def run_monitoring(conn, table_name: str):
                 log_monitoring(conn, table_name, "Schema", "OK")
             else:
                 log_monitoring(conn, table_name, "Schema", "FAIL", f"Columns present: {cols}")
+                table_ok = False
 
     except Exception as e:
         log_monitoring(conn, table_name, "General", "FAIL", str(e))
+        table_ok = False
+
+    return table_ok
 
 # -----------------------------
 # 4. Main Run
@@ -171,12 +178,19 @@ try:
     upsert_daily(conn, vix_df, "VIX_HISTORICAL")
     upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
 
-    # Monitoring
+    # Monitoring + Alerting
+    all_ok = True
     for tbl in ["SPX_HISTORICAL","ES_HISTORICAL","VIX_HISTORICAL","VVIX_HISTORICAL"]:
-        run_monitoring(conn, tbl)
+        if not run_monitoring(conn, tbl):
+            all_ok = False
 
-    print("🎉 Ingestion + Monitoring complete. Results logged in MONITORING_LOG.")
     conn.close()
+
+    if not all_ok:
+        print("❌ Monitoring detected failures. Failing job for CI/CD alert.")
+        sys.exit(1)
+
+    print("🎉 Ingestion + Monitoring successful. All checks OK.")
 except Exception as e:
     print("❌ Pipeline failed:", e)
-    raise
+    sys.exit(1)
