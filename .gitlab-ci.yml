@@ -1,15 +1,14 @@
 # 📄 File: .gitlab-ci.yml
 #
 # 📌 Title
-# Zen Council – Master CI/CD Pipeline (Skeletonized: Stage 4 Active, Others Commented)
+# Zen Council – Master CI/CD Pipeline (Skeletonized: Stage 5 Active)
 #
 # 📝 Commit Notes
-# Commit Title: CI: skeletonized pipeline with Stage 4 active, all other jobs commented
+# Commit Title: CI: skeletonized pipeline with Stage 5 active, others commented
 # Commit Message:
-# - Preserved all jobs (Stages 1 → 5) in file for visibility and future re-enablement.
-# - Only Stage 4 Audit Loop is active to focus debugging and speed runtime.
-# - Other jobs are commented out, ready to be uncommented when validated.
-# - Ensures single source of truth for pipeline structure, avoids job drift.
+# - All stages retained in file for consistency and visibility.
+# - Only Stage 5 formatting/distribution job enabled.
+# - Other jobs commented out to reduce runtime while validating Stage 5.
 
 stages:
   - ingest
@@ -28,19 +27,19 @@ default:
     - pip install -r requirements.txt
 
 # --------------------------
-# ✅ ACTIVE JOB (Stage 4 Audit Loop)
+# ✅ ACTIVE JOB (Stage 5 Formatting & Distribution)
 # --------------------------
 
-stage4_audit_loop:
-  stage: audit
+stage5_formatting:
+  stage: formatting
   script:
-    - python src/ingest_audit_loop.py
+    - python src/format_and_send_forecast.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # --------------------------
-# ❌ INACTIVE JOBS (commented out for now)
+# ❌ INACTIVE JOBS (commented out for now, retained for later)
 # --------------------------
 
 # Stage 1: Daily Market Data Ingestion
@@ -92,12 +91,12 @@ stage4_audit_loop:
 #     - if: '$CI_PIPELINE_SOURCE == "schedule"'
 #     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 5: Formatting & Distribution
-# stage5_formatting:
-#   stage: formatting
-#   needs: ["stage4_audit_loop"]
+# Stage 4: Audit Loop
+# stage4_audit_loop:
+#   stage: audit
+#   needs: ["stage3_forecast_jobs"]
 #   script:
-#     - python src/format_and_send_forecast.py
+#     - python src/ingest_audit_loop.py
 #   rules:
 #     - if: '$CI_PIPELINE_SOURCE == "schedule"'
 #     - if: '$CI_COMMIT_BRANCH == "main"'
