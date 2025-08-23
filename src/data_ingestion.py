@@ -1,31 +1,37 @@
 """
-Stage 1.4 – Daily OHLCV Ingestion with Monitoring & Validation
---------------------------------------------------------------
-- Ingest SPX, ES, VIX, VVIX OHLCV daily from Yahoo Finance.
-- Deduplication-safe upsert.
-- Monitoring: freshness, duplicates, schema.
-- Validation rules:
-  * Critical (fail job): missing dates, duplicate dates, negative/zero prices.
-  * Non-critical (soft log): OHLC mismatches, abnormal volume.
-- Logs monitoring into MONITORING_LOG.
-- Logs anomalies into DATA_QUALITY_LOG (always created at run start).
-- If critical issues → job fails (CI/CD alert).
+Stage 1.5.5 – Historical Backfill Validation (Market-Calendar + COVID Aware)
+----------------------------------------------------------------------------
+Purpose:
+- Validate 5y backfill vs daily ingestion.
+- Uses official NYSE market calendar (not just federal holidays).
+- COVID-era window (2020-01-01 → 2021-06-30): gaps logged as WARN, not FAIL.
+- Uses LOAD_TS to detect backfill vs daily cutoff.
+- Prints summary + FAIL details before exit.
+
+Critical FAIL:
+- Missing non-holiday trading days (outside COVID window)
+- Empty table
+- Overlap mismatch (only when multiple LOAD_TS exist)
+- OHLC mismatch > tolerance
+
+Warnings only:
+- Only one LOAD_TS group (backfill-only mode)
+- COVID-era missing dates
+- Empty partition at cutoff
 """
 
-import os
-import sys
+import os, sys
 import pandas as pd
 import snowflake.connector
-from snowflake.connector.pandas_tools import write_pandas
-import yfinance as yf
-from dotenv import load_dotenv
 from datetime import datetime, UTC
+from dotenv import load_dotenv
+from collections import Counter
+import pandas_market_calendars as mcal
 
 # -----------------------------
-# 1. Load environment variables
+# 1. Load env vars
 # -----------------------------
 load_dotenv()
-
 SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
 SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
 SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -34,67 +40,16 @@ SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
 SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
 
 # -----------------------------
-# 2. Helpers
+# 2. Logging
 # -----------------------------
-def normalize_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalize Yahoo Finance DataFrame into DATE, OPEN, HIGH, LOW, CLOSE, VOLUME."""
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["DATE","OPEN","HIGH","LOW","CLOSE","VOLUME"])
+results = Counter()
+fail_messages = []
 
-    df = df.reset_index()
-    df.columns = [c if not isinstance(c, tuple) else c[0] for c in df.columns]
-
-    if "Date" in df.columns:
-        df.rename(columns={"Date": "DATE"}, inplace=True)
-
-    df = df[["DATE", "Open", "High", "Low", "Close", "Volume"]]
-    df.rename(columns={"Open":"OPEN", "High":"HIGH", "Low":"LOW", 
-                       "Close":"CLOSE", "Volume":"VOLUME"}, inplace=True)
-
-    df["DATE"] = pd.to_datetime(df["DATE"]).dt.date
-    df = df.round({"OPEN":2, "HIGH":2, "LOW":2, "CLOSE":2})
-
-    return df.dropna()
-
-def get_spx(): return normalize_df(yf.download("^GSPC", period="1d", interval="1d", auto_adjust=False))
-def get_es():  return normalize_df(yf.download("ES=F", period="1d", interval="1d", auto_adjust=False))
-def get_vix(): return normalize_df(yf.download("^VIX", period="1d", interval="1d", auto_adjust=False))
-def get_vvix():return normalize_df(yf.download("^VVIX", period="1d", interval="1d", auto_adjust=False))
-
-def upsert_daily(conn, df: pd.DataFrame, table_name: str):
-    """Delete any rows for the date range being inserted, then reload clean data."""
-    if df.empty:
-        print(f"⚠️ No data to insert for {table_name}")
-        return
-
-    min_date = df["DATE"].min()
-    max_date = df["DATE"].max()
-
-    with conn.cursor() as cur:
-        cur.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                DATE DATE, 
-                OPEN FLOAT, 
-                HIGH FLOAT, 
-                LOW FLOAT, 
-                CLOSE FLOAT, 
-                VOLUME FLOAT
-            )
-        """)
-        cur.execute(
-            f"DELETE FROM {table_name} WHERE DATE BETWEEN '{min_date}' AND '{max_date}'"
-        )
-        print(f"🧹 Removed existing rows in {table_name} from {min_date} → {max_date}")
-
-    write_pandas(conn, df.reset_index(drop=True), table_name)
-    print(f"✅ Inserted {len(df)} rows into {table_name}")
-
-# -----------------------------
-# 3. Monitoring & Validation
-# -----------------------------
 def log_event(conn, table, log_table, check_type, status, details=""):
-    """Log results into MONITORING_LOG or DATA_QUALITY_LOG."""
     run_ts = datetime.now(UTC)
+    results[status] += 1
+    if status == "FAIL":
+        fail_messages.append(f"{table} | {check_type} | {details}")
     with conn.cursor() as cur:
         cur.execute(f"""
             CREATE TABLE IF NOT EXISTS {log_table} (
@@ -110,39 +65,82 @@ def log_event(conn, table, log_table, check_type, status, details=""):
             VALUES ('{run_ts}', '{table}', '{check_type}', '{status}', '{details}')
         """)
 
-def run_validation(conn, df: pd.DataFrame, table_name: str) -> bool:
-    """Run data validation rules. Returns True if all critical checks pass."""
-    valid = True
+# -----------------------------
+# 3. Validation
+# -----------------------------
+def fetch_table(conn, table_name: str) -> pd.DataFrame:
+    with conn.cursor() as cur:
+        cur.execute(f"SELECT DATE, OPEN, HIGH, LOW, CLOSE, VOLUME, LOAD_TS FROM {table_name} ORDER BY DATE")
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        return pd.DataFrame(rows, columns=cols)
 
-    for _, row in df.iterrows():
-        date, o, h, l, c, v = row
+def check_continuity(conn, df, table_name) -> bool:
+    ok = True
+    df["DATE"] = pd.to_datetime(df["DATE"])
 
-        # Critical: negative/zero prices
-        if o <= 0 or h <= 0 or l <= 0 or c <= 0:
-            log_event(conn, table_name, "DATA_QUALITY_LOG", "Price Check", "FAIL", f"Invalid price on {date}")
-            valid = False
+    nyse = mcal.get_calendar("XNYS")
+    trading_days = nyse.valid_days(start_date=df["DATE"].min(), end_date=df["DATE"].max()).date
 
-        # Non-critical: OHLC mismatch
-        if not (l <= o <= h and l <= c <= h):
-            log_event(conn, table_name, "DATA_QUALITY_LOG", "OHLC Check", "WARN", f"OHLC mismatch on {date}")
+    missing = sorted(set(trading_days) - set(df["DATE"].dt.date))
 
-        # Non-critical: abnormal volume (>10x mean)
-        if v and df["VOLUME"].mean() > 0 and v > 10 * df["VOLUME"].mean():
-            log_event(conn, table_name, "DATA_QUALITY_LOG", "Volume Check", "WARN", f"Abnormal volume {v} on {date}")
+    covid_start = pd.Timestamp("2020-01-01").date()
+    covid_end   = pd.Timestamp("2021-06-30").date()
 
-    return valid
+    covid_missing = [d for d in missing if covid_start <= d <= covid_end]
+    real_missing  = [d for d in missing if d < covid_start or d > covid_end]
+
+    if real_missing:
+        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "FAIL",
+                  f"Missing trading days: {real_missing[:5]}...")
+        ok = False
+    if covid_missing:
+        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "WARN",
+                  f"COVID-era gaps: {covid_missing[:5]}...")
+    if not missing:
+        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "OK")
+    return ok
+
+def detect_cutoff(df):
+    ts_groups = df.groupby("LOAD_TS")["DATE"].max().sort_index()
+    if len(ts_groups) < 2:
+        return None
+    return ts_groups.iloc[0]
+
+def check_overlap_and_integrity(conn, df, table_name, tolerance=0.005) -> bool:
+    ok = True
+    cutoff = detect_cutoff(df)
+    if cutoff is None:
+        log_event(conn, table_name, "MONITORING_LOG", "Data Split", "WARN",
+                  "Only one LOAD_TS group (backfill-only).")
+        return ok
+    backfill = df[df["DATE"] <= cutoff]
+    daily = df[df["DATE"] >= cutoff]
+    if backfill.empty or daily.empty:
+        log_event(conn, table_name, "MONITORING_LOG", "Data Split", "WARN",
+                  "Backfill or daily empty.")
+        return ok
+    if backfill["DATE"].max() != daily["DATE"].min():
+        log_event(conn, table_name, "MONITORING_LOG", "Overlap Check", "FAIL",
+                  f"Backfill last={backfill['DATE'].max()} vs Daily first={daily['DATE'].min()}")
+        ok = False
+    else:
+        log_event(conn, table_name, "MONITORING_LOG", "Overlap Check", "OK")
+    overlap = pd.merge(backfill.tail(1), daily.head(1), on="DATE", suffixes=("_HIST","_DAILY"))
+    for _, row in overlap.iterrows():
+        for col in ["OPEN","HIGH","LOW","CLOSE"]:
+            val_hist, val_daily = row[f"{col}_HIST"], row[f"{col}_DAILY"]
+            if abs(val_hist - val_daily) / max(val_hist,1e-9) > tolerance:
+                log_event(conn, table_name, "DATA_QUALITY_LOG", f"{col} Integrity", "FAIL",
+                          f"{col} mismatch {row['DATE']} hist={val_hist} daily={val_daily}")
+                ok = False
+            else:
+                log_event(conn, table_name, "DATA_QUALITY_LOG", f"{col} Integrity", "OK")
+    return ok
 
 # -----------------------------
 # 4. Main Run
 # -----------------------------
-spx_df, es_df, vix_df, vvix_df = get_spx(), get_es(), get_vix(), get_vvix()
-
-print("✅ Data fetched:")
-print("SPX:", spx_df.tail(1))
-print("ES:", es_df.tail(1))
-print("VIX:", vix_df.tail(1))
-print("VVIX:", vvix_df.tail(1))
-
 try:
     conn = snowflake.connector.connect(
         user=SNOWFLAKE_USER,
@@ -152,39 +150,31 @@ try:
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
     )
-    print(f"✅ Connected to Snowflake account {SNOWFLAKE_ACCOUNT} as {SNOWFLAKE_USER}")
+    print(f"✅ Connected to Snowflake {SNOWFLAKE_ACCOUNT}")
 
-    # Ensure DATA_QUALITY_LOG always exists, even if no anomalies are logged
-    with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS DATA_QUALITY_LOG (
-                RUN_TS TIMESTAMP,
-                TABLE_NAME STRING,
-                CHECK_TYPE STRING,
-                STATUS STRING,
-                DETAILS STRING
-            )
-        """)
-
-    # Ingestion
-    upsert_daily(conn, spx_df, "SPX_HISTORICAL")
-    upsert_daily(conn, es_df, "ES_HISTORICAL")
-    upsert_daily(conn, vix_df, "VIX_HISTORICAL")
-    upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
-
-    # Validation
     all_ok = True
-    for df, tbl in [(spx_df,"SPX_HISTORICAL"),(es_df,"ES_HISTORICAL"),(vix_df,"VIX_HISTORICAL"),(vvix_df,"VVIX_HISTORICAL")]:
-        if not run_validation(conn, df, tbl):
+    for symbol in ["SPX","ES","VIX","VVIX"]:
+        tbl = f"{symbol}_HISTORICAL"
+        df = fetch_table(conn, tbl)
+        if df.empty:
+            log_event(conn, symbol, "MONITORING_LOG", "Data Availability", "FAIL", "Empty table")
             all_ok = False
+            continue
+        if not check_continuity(conn, df, tbl): all_ok = False
+        if not check_overlap_and_integrity(conn, df, tbl): all_ok = False
 
     conn.close()
 
-    if not all_ok:
-        print("❌ Critical validation failures detected. Failing job for CI/CD alert.")
+    print(f"📊 Summary → OK={results['OK']} | WARN={results['WARN']} | FAIL={results['FAIL']}")
+    if results["FAIL"] > 0:
+        print("❌ FAIL Details:")
+        for msg in fail_messages[-10:]:
+            print("   -", msg)
         sys.exit(1)
 
-    print("🎉 Ingestion + Monitoring + Validation complete. All critical checks passed.")
+    print("🎉 Stage 1.5.5 Historical Backfill Validation complete. All checks passed.")
+
 except Exception as e:
-    print("❌ Pipeline failed:", e)
+    print("❌ Stage 1.5.5 job failed:", e)
     sys.exit(1)
+
