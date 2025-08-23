@@ -1,66 +1,37 @@
-# 📄 File: .gitlab-ci.yml
-#
 # 📌 Title
-# Zen Council – GitLab CI/CD Pipeline (Daily Ingestion + Derived Metrics + Correlations + VIX Term Structure)
+# Zen Council – CI Jobs for Stage 3.x (Forecast, Scoring, Email)
 #
 # 📝 Commit Notes
-# Commit Title: CI: align custom stages with GitLab pipeline (add ingest + metrics)
+# Commit Title: CI: add Stage 3.x jobs (forecast, scoring, email) chained after Stage 2.3
 # Commit Message:
-# - Explicitly defines `ingest` and `metrics` stages alongside GitLab defaults.
-# - Ensures jobs for Stage 2.1, 2.2, 2.3 are recognized and scheduled.
-# - Resolves “chosen stage metrics does not exist” error seen previously.
-# - Pipeline order: ingest → metrics → (then standard build/test/deploy if needed).
+# - Adds stage3_forecast_job → runs ingest_forecast_job.py
+# - Adds stage3_score_job → runs score_forecast_job.py
+# - Adds stage3_email_job → runs send_forecast_email.py
+# - Uses `needs:` chaining to enforce order: forecast → score → email.
 
-stages:
-  - ingest
-  - metrics
-  - build
-  - test
-  - deploy
-
-# Stage 1: Daily Market Data Ingestion
-daily_ingestion:
-  stage: ingest
-  image: python:3.11-slim
+stage3_forecast_job:
+  stage: metrics
+  needs: ["stage2_vix_term_structure"]
   script:
-    - pip install -r requirements.txt
-    - python src/data_ingestion.py
+    - python src/ingest_forecast_job.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 2.1: Derived Metrics
-stage2_derived_metrics:
+stage3_score_job:
   stage: metrics
-  image: python:3.11-slim
-  needs: ["daily_ingestion"]
+  needs: ["stage3_forecast_job"]
   script:
-    - pip install -r requirements.txt
-    - python src/ingest_derived_metrics.py
+    - python src/score_forecast_job.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 2.2: Rolling Correlations
-stage2_rolling_correlations:
+stage3_email_job:
   stage: metrics
-  image: python:3.11-slim
-  needs: ["stage2_derived_metrics"]
+  needs: ["stage3_score_job"]
   script:
-    - pip install -r requirements.txt
-    - python src/ingest_correlations.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 2.3: VIX Term Structure
-stage2_vix_term_structure:
-  stage: metrics
-  image: python:3.11-slim
-  needs: ["stage2_rolling_correlations"]
-  script:
-    - pip install -r requirements.txt
-    - python src/ingest_vix_term_structure.py
+    - python src/send_forecast_email.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == "main"'
