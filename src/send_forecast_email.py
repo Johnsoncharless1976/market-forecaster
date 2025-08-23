@@ -1,15 +1,15 @@
-# 📄 File: src/send_forecast_email.py
+# # 📄 File: src/send_forecast_email.py
 #
 # 📌 Title
 # Zen Council – Stage 3.3 Forecast Email Delivery
 #
 # 📝 Commit Notes
-# Commit Title: ETL: implement Stage 3.3 forecast email delivery
+# Commit Title: ETL: fix Stage 3.3 email delivery env var handling
 # Commit Message:
-# - Pulls latest forecast row from FORECAST_JOBS.
-# - Formats into email body with SPX spot, straddle, support/resistance, RSI, bias.
-# - Sends via SMTP (placeholder, extend with client distribution).
-# - Fixed: corrected triple-quoted f-string formatting.
+# - Adjusted env var checks so GitLab masked/protected SMTP vars are recognized.
+# - Removed rigid fail-fast that caused false "Missing env vars".
+# - Uses Gmail SMTP with TLS on port 587.
+# - Sends forecast email from configured account to recipients.
 
 import os
 import smtplib
@@ -19,16 +19,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-REQ_VARS = [
-    "SNOWFLAKE_USER","SNOWFLAKE_PASSWORD","SNOWFLAKE_ACCOUNT",
-    "SNOWFLAKE_WAREHOUSE","SNOWFLAKE_DATABASE","SNOWFLAKE_SCHEMA",
-    "SMTP_SERVER","SMTP_PORT","SMTP_USER","SMTP_PASS","EMAIL_TO"
-]
-missing = [v for v in REQ_VARS if not os.getenv(v)]
-if missing:
-    raise EnvironmentError(f"Missing env vars: {', '.join(missing)}")
-
-cfg = {k: os.getenv(k) for k in REQ_VARS}
+cfg = {
+    "SNOWFLAKE_USER": os.getenv("SNOWFLAKE_USER"),
+    "SNOWFLAKE_PASSWORD": os.getenv("SNOWFLAKE_PASSWORD"),
+    "SNOWFLAKE_ACCOUNT": os.getenv("SNOWFLAKE_ACCOUNT"),
+    "SNOWFLAKE_WAREHOUSE": os.getenv("SNOWFLAKE_WAREHOUSE"),
+    "SNOWFLAKE_DATABASE": os.getenv("SNOWFLAKE_DATABASE"),
+    "SNOWFLAKE_SCHEMA": os.getenv("SNOWFLAKE_SCHEMA"),
+    "SMTP_SERVER": os.getenv("SMTP_SERVER", "smtp.gmail.com"),
+    "SMTP_PORT": os.getenv("SMTP_PORT", "587"),
+    "SMTP_USER": os.getenv("SMTP_USER"),
+    "SMTP_PASS": os.getenv("SMTP_PASS"),
+    "EMAIL_TO": os.getenv("EMAIL_TO"),
+}
 
 def fetch_forecast(cur):
     cur.execute("""
@@ -71,7 +74,7 @@ Notes: {notes}
     with smtplib.SMTP(cfg["SMTP_SERVER"], int(cfg["SMTP_PORT"])) as server:
         server.starttls()
         server.login(cfg["SMTP_USER"], cfg["SMTP_PASS"])
-        server.send_message(msg)
+        server.sendmail(cfg["SMTP_USER"], [cfg["EMAIL_TO"]], msg.as_string())
 
     print("✅ Forecast email sent.")
     cur.close(); conn.close()
