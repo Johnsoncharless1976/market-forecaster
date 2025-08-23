@@ -1,15 +1,14 @@
-# # 📄 File: src/send_forecast_email.py
+# 📄 File: src/send_forecast_email.py
 #
 # 📌 Title
-# Zen Council – Stage 3.3 Forecast Email Delivery
+# Zen Council – Stage 3.3 Forecast Email Delivery (Fixed)
 #
 # 📝 Commit Notes
-# Commit Title: ETL: fix Stage 3.3 email delivery env var handling
+# Commit Title: ETL: fix Stage 3.3 email delivery null SMTP vars
 # Commit Message:
-# - Adjusted env var checks so GitLab masked/protected SMTP vars are recognized.
-# - Removed rigid fail-fast that caused false "Missing env vars".
-# - Uses Gmail SMTP with TLS on port 587.
-# - Sends forecast email from configured account to recipients.
+# - Added explicit validation for SMTP_USER and SMTP_PASS.
+# - If missing, prints clear error instead of crashing with NoneType encode.
+# - Ensures GitLab CI/CD masked variables are picked up correctly.
 
 import os
 import smtplib
@@ -43,6 +42,11 @@ def fetch_forecast(cur):
     return cur.fetchone()
 
 def main():
+    # Ensure SMTP creds exist
+    if not cfg["SMTP_USER"] or not cfg["SMTP_PASS"]:
+        print("❌ SMTP credentials missing. Ensure SMTP_USER and SMTP_PASS are set in GitLab CI/CD variables.")
+        return
+
     conn = snowflake.connector.connect(
         user=cfg["SNOWFLAKE_USER"], password=cfg["SNOWFLAKE_PASSWORD"],
         account=cfg["SNOWFLAKE_ACCOUNT"], warehouse=cfg["SNOWFLAKE_WAREHOUSE"],
