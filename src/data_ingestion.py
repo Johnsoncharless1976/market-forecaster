@@ -1,37 +1,27 @@
 """
-Stage 1.5.5 – Historical Backfill Validation (Market-Calendar + COVID Aware)
-----------------------------------------------------------------------------
-Purpose:
-- Validate 5y backfill vs daily ingestion.
-- Uses official NYSE market calendar (not just federal holidays).
-- COVID-era window (2020-01-01 → 2021-06-30): gaps logged as WARN, not FAIL.
-- Uses LOAD_TS to detect backfill vs daily cutoff.
-- Prints summary + FAIL details before exit.
-
-Critical FAIL:
-- Missing non-holiday trading days (outside COVID window)
-- Empty table
-- Overlap mismatch (only when multiple LOAD_TS exist)
-- OHLC mismatch > tolerance
-
-Warnings only:
-- Only one LOAD_TS group (backfill-only mode)
-- COVID-era missing dates
-- Empty partition at cutoff
+Zen Council – Stage 2.1 Derived Metrics Ingestion Job (Idempotent)
+------------------------------------------------------------------
+Computes Daily Return, 10D Volatility, ATR 14D from *_HISTORICAL tables and
+MERGEs results into FORECAST_DERIVED_METRICS without duplicates.
 """
 
-import os, sys
+import os
+from typing import List, Tuple
 import pandas as pd
+import numpy as np
 import snowflake.connector
-from datetime import datetime, UTC
 from dotenv import load_dotenv
-from collections import Counter
-import pandas_market_calendars as mcal
 
-# -----------------------------
-# 1. Load env vars
-# -----------------------------
+# Load env
 load_dotenv()
+REQUIRED_VARS = [
+    "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD", "SNOWFLAKE_ACCOUNT",
+    "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
+]
+missing = [v for v in REQUIRED_VARS if not os.getenv(v)]
+if missing:
+    raise EnvironmentError(f"Missing required env vars: {', '.join(missing)}")
+
 SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
 SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
 SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -39,109 +29,69 @@ SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
 SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
 SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
 
-# -----------------------------
-# 2. Logging
-# -----------------------------
-results = Counter()
-fail_messages = []
+def calculate_daily_return(df: pd.DataFrame) -> pd.Series:
+    return df["CLOSE"].pct_change()
 
-def log_event(conn, table, log_table, check_type, status, details=""):
-    run_ts = datetime.now(UTC)
-    results[status] += 1
-    if status == "FAIL":
-        fail_messages.append(f"{table} | {check_type} | {details}")
-    with conn.cursor() as cur:
-        cur.execute(f"""
-            CREATE TABLE IF NOT EXISTS {log_table} (
-                RUN_TS TIMESTAMP,
-                TABLE_NAME STRING,
-                CHECK_TYPE STRING,
-                STATUS STRING,
-                DETAILS STRING
-            )
-        """)
-        cur.execute(f"""
-            INSERT INTO {log_table} (RUN_TS, TABLE_NAME, CHECK_TYPE, STATUS, DETAILS)
-            VALUES ('{run_ts}', '{table}', '{check_type}', '{status}', '{details}')
-        """)
+def calculate_volatility(df: pd.DataFrame, window: int = 10) -> pd.Series:
+    return df["DAILY_RETURN"].rolling(window=window).std()
 
-# -----------------------------
-# 3. Validation
-# -----------------------------
-def fetch_table(conn, table_name: str) -> pd.DataFrame:
-    with conn.cursor() as cur:
-        cur.execute(f"SELECT DATE, OPEN, HIGH, LOW, CLOSE, VOLUME, LOAD_TS FROM {table_name} ORDER BY DATE")
-        rows = cur.fetchall()
-        cols = [d[0] for d in cur.description]
-        return pd.DataFrame(rows, columns=cols)
+def calculate_atr(df: pd.DataFrame, window: int = 14) -> pd.Series:
+    high_low = df["HIGH"] - df["LOW"]
+    high_close = (df["HIGH"] - df["CLOSE"].shift()).abs()
+    low_close = (df["LOW"] - df["CLOSE"].shift()).abs()
+    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+    return tr.rolling(window=window).mean()
 
-def check_continuity(conn, df, table_name) -> bool:
-    ok = True
+def fetch_historical(symbol: str, cur) -> pd.DataFrame:
+    cur.execute(f"""
+        SELECT DATE, OPEN, HIGH, LOW, CLOSE
+        FROM {symbol}_HISTORICAL
+        ORDER BY DATE
+    """)
+    df = pd.DataFrame(cur.fetchall(), columns=["DATE", "OPEN", "HIGH", "LOW", "CLOSE"])
     df["DATE"] = pd.to_datetime(df["DATE"])
+    return df
 
-    nyse = mcal.get_calendar("XNYS")
-    trading_days = nyse.valid_days(start_date=df["DATE"].min(), end_date=df["DATE"].max()).date
+def build_rows(df: pd.DataFrame, symbol: str) -> List[Tuple]:
+    data = df[["DATE", "DAILY_RETURN", "VOLATILITY_10D", "ATR_14D"]].dropna()
+    return [(r.DATE.date(), symbol, float(r.DAILY_RETURN), float(r.VOLATILITY_10D), float(r.ATR_14D))
+            for r in data.itertuples()]
 
-    missing = sorted(set(trading_days) - set(df["DATE"].dt.date))
+def merge_metrics(rows: List[Tuple], cur):
+    # Create a temporary staging table
+    cur.execute("""
+        CREATE OR REPLACE TEMP TABLE STG_FORECAST_DERIVED_METRICS (
+            DATE DATE,
+            SYMBOL STRING,
+            DAILY_RETURN FLOAT,
+            VOLATILITY_10D FLOAT,
+            ATR_14D FLOAT
+        )
+    """)
+    # Bulk load into staging table
+    cur.executemany("""
+        INSERT INTO STG_FORECAST_DERIVED_METRICS
+        (DATE, SYMBOL, DAILY_RETURN, VOLATILITY_10D, ATR_14D)
+        VALUES (%s, %s, %s, %s, %s)
+    """, rows)
 
-    covid_start = pd.Timestamp("2020-01-01").date()
-    covid_end   = pd.Timestamp("2021-06-30").date()
+    # Idempotent upsert into target
+    cur.execute("""
+        MERGE INTO FORECAST_DERIVED_METRICS AS T
+        USING STG_FORECAST_DERIVED_METRICS AS S
+        ON T.DATE = S.DATE AND T.SYMBOL = S.SYMBOL
+        WHEN MATCHED THEN UPDATE SET
+            T.DAILY_RETURN   = S.DAILY_RETURN,
+            T.VOLATILITY_10D = S.VOLATILITY_10D,
+            T.ATR_14D        = S.ATR_14D,
+            T.LOAD_TS        = CURRENT_TIMESTAMP()
+        WHEN NOT MATCHED THEN INSERT
+            (DATE, SYMBOL, DAILY_RETURN, VOLATILITY_10D, ATR_14D)
+        VALUES
+            (S.DATE, S.SYMBOL, S.DAILY_RETURN, S.VOLATILITY_10D, S.ATR_14D)
+    """)
 
-    covid_missing = [d for d in missing if covid_start <= d <= covid_end]
-    real_missing  = [d for d in missing if d < covid_start or d > covid_end]
-
-    if real_missing:
-        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "FAIL",
-                  f"Missing trading days: {real_missing[:5]}...")
-        ok = False
-    if covid_missing:
-        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "WARN",
-                  f"COVID-era gaps: {covid_missing[:5]}...")
-    if not missing:
-        log_event(conn, table_name, "MONITORING_LOG", "Continuity Check", "OK")
-    return ok
-
-def detect_cutoff(df):
-    ts_groups = df.groupby("LOAD_TS")["DATE"].max().sort_index()
-    if len(ts_groups) < 2:
-        return None
-    return ts_groups.iloc[0]
-
-def check_overlap_and_integrity(conn, df, table_name, tolerance=0.005) -> bool:
-    ok = True
-    cutoff = detect_cutoff(df)
-    if cutoff is None:
-        log_event(conn, table_name, "MONITORING_LOG", "Data Split", "WARN",
-                  "Only one LOAD_TS group (backfill-only).")
-        return ok
-    backfill = df[df["DATE"] <= cutoff]
-    daily = df[df["DATE"] >= cutoff]
-    if backfill.empty or daily.empty:
-        log_event(conn, table_name, "MONITORING_LOG", "Data Split", "WARN",
-                  "Backfill or daily empty.")
-        return ok
-    if backfill["DATE"].max() != daily["DATE"].min():
-        log_event(conn, table_name, "MONITORING_LOG", "Overlap Check", "FAIL",
-                  f"Backfill last={backfill['DATE'].max()} vs Daily first={daily['DATE'].min()}")
-        ok = False
-    else:
-        log_event(conn, table_name, "MONITORING_LOG", "Overlap Check", "OK")
-    overlap = pd.merge(backfill.tail(1), daily.head(1), on="DATE", suffixes=("_HIST","_DAILY"))
-    for _, row in overlap.iterrows():
-        for col in ["OPEN","HIGH","LOW","CLOSE"]:
-            val_hist, val_daily = row[f"{col}_HIST"], row[f"{col}_DAILY"]
-            if abs(val_hist - val_daily) / max(val_hist,1e-9) > tolerance:
-                log_event(conn, table_name, "DATA_QUALITY_LOG", f"{col} Integrity", "FAIL",
-                          f"{col} mismatch {row['DATE']} hist={val_hist} daily={val_daily}")
-                ok = False
-            else:
-                log_event(conn, table_name, "DATA_QUALITY_LOG", f"{col} Integrity", "OK")
-    return ok
-
-# -----------------------------
-# 4. Main Run
-# -----------------------------
-try:
+def main():
     conn = snowflake.connector.connect(
         user=SNOWFLAKE_USER,
         password=SNOWFLAKE_PASSWORD,
@@ -150,31 +100,21 @@ try:
         database=SNOWFLAKE_DATABASE,
         schema=SNOWFLAKE_SCHEMA,
     )
-    print(f"✅ Connected to Snowflake {SNOWFLAKE_ACCOUNT}")
+    cur = conn.cursor()
 
-    all_ok = True
-    for symbol in ["SPX","ES","VIX","VVIX"]:
-        tbl = f"{symbol}_HISTORICAL"
-        df = fetch_table(conn, tbl)
-        if df.empty:
-            log_event(conn, symbol, "MONITORING_LOG", "Data Availability", "FAIL", "Empty table")
-            all_ok = False
-            continue
-        if not check_continuity(conn, df, tbl): all_ok = False
-        if not check_overlap_and_integrity(conn, df, tbl): all_ok = False
+    for symbol in ["SPX", "ES", "VIX", "VVIX"]:
+        df = fetch_historical(symbol, cur)
+        df["DAILY_RETURN"] = calculate_daily_return(df)
+        df["VOLATILITY_10D"] = calculate_volatility(df)
+        df["ATR_14D"] = calculate_atr(df)
+        rows = build_rows(df, symbol)
+        if rows:
+            merge_metrics(rows, cur)
 
+    conn.commit()
+    cur.close()
     conn.close()
+    print("✅ Derived metrics ingestion (MERGE) complete.")
 
-    print(f"📊 Summary → OK={results['OK']} | WARN={results['WARN']} | FAIL={results['FAIL']}")
-    if results["FAIL"] > 0:
-        print("❌ FAIL Details:")
-        for msg in fail_messages[-10:]:
-            print("   -", msg)
-        sys.exit(1)
-
-    print("🎉 Stage 1.5.5 Historical Backfill Validation complete. All checks passed.")
-
-except Exception as e:
-    print("❌ Stage 1.5.5 job failed:", e)
-    sys.exit(1)
-
+if __name__ == "__main__":
+    main()
