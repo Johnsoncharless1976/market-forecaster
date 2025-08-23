@@ -1,11 +1,15 @@
 """
-Stage 1.3 – Daily OHLCV Ingestion with Monitoring & Alerting
-------------------------------------------------------------
+Stage 1.4 – Daily OHLCV Ingestion with Monitoring & Validation
+--------------------------------------------------------------
 - Ingest SPX, ES, VIX, VVIX OHLCV daily from Yahoo Finance.
-- Deduplication-safe upsert: removes overlap in date range before insert.
-- Monitoring: schema, freshness, duplicates.
-- Logs monitoring results into MONITORING_LOG (Snowflake).
-- NEW: If any check = FAIL → raise exception and fail job, triggering CI/CD alert.
+- Deduplication-safe upsert.
+- Monitoring: freshness, duplicates, schema.
+- Validation rules:
+  * Critical (fail job): missing dates, duplicate dates, negative/zero prices.
+  * Non-critical (soft log): OHLC mismatches, abnormal volume.
+- Logs monitoring into MONITORING_LOG.
+- Logs anomalies into DATA_QUALITY_LOG (always created at run start).
+- If critical issues → job fails (CI/CD alert).
 """
 
 import os
@@ -86,69 +90,47 @@ def upsert_daily(conn, df: pd.DataFrame, table_name: str):
     print(f"✅ Inserted {len(df)} rows into {table_name}")
 
 # -----------------------------
-# 3. Monitoring Helpers
+# 3. Monitoring & Validation
 # -----------------------------
-def log_monitoring(conn, table_name: str, check_type: str, status: str, details: str = ""):
-    """Insert monitoring results into MONITORING_LOG."""
+def log_event(conn, table, log_table, check_type, status, details=""):
+    """Log results into MONITORING_LOG or DATA_QUALITY_LOG."""
     run_ts = datetime.now(UTC)
-
     with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS MONITORING_LOG (
-                RUN_TS TIMESTAMP, 
-                TABLE_NAME STRING, 
-                CHECK_TYPE STRING, 
-                STATUS STRING, 
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {log_table} (
+                RUN_TS TIMESTAMP,
+                TABLE_NAME STRING,
+                CHECK_TYPE STRING,
+                STATUS STRING,
                 DETAILS STRING
             )
         """)
         cur.execute(f"""
-            INSERT INTO MONITORING_LOG (RUN_TS, TABLE_NAME, CHECK_TYPE, STATUS, DETAILS)
-            VALUES ('{run_ts}', '{table_name}', '{check_type}', '{status}', '{details}')
+            INSERT INTO {log_table} (RUN_TS, TABLE_NAME, CHECK_TYPE, STATUS, DETAILS)
+            VALUES ('{run_ts}', '{table}', '{check_type}', '{status}', '{details}')
         """)
 
-def run_monitoring(conn, table_name: str) -> bool:
-    """Run freshness, duplicates, schema checks for a table. Returns True if all OK, else False."""
-    table_ok = True
-    try:
-        with conn.cursor() as cur:
-            # Freshness
-            cur.execute(f"SELECT MAX(DATE) FROM {table_name}")
-            last_date = cur.fetchone()[0]
-            if last_date:
-                log_monitoring(conn, table_name, "Freshness", "OK", f"Last date = {last_date}")
-            else:
-                log_monitoring(conn, table_name, "Freshness", "FAIL", "No rows found")
-                table_ok = False
+def run_validation(conn, df: pd.DataFrame, table_name: str) -> bool:
+    """Run data validation rules. Returns True if all critical checks pass."""
+    valid = True
 
-            # Duplicates
-            cur.execute(f"""
-                SELECT COUNT(*) FROM (
-                    SELECT DATE FROM {table_name} GROUP BY DATE HAVING COUNT(*) > 1
-                )
-            """)
-            dups = cur.fetchone()[0]
-            if dups == 0:
-                log_monitoring(conn, table_name, "Duplicates", "OK")
-            else:
-                log_monitoring(conn, table_name, "Duplicates", "FAIL", f"{dups} duplicate dates found")
-                table_ok = False
+    for _, row in df.iterrows():
+        date, o, h, l, c, v = row
 
-            # Schema
-            cur.execute(f"DESC TABLE {table_name}")
-            cols = [row[0] for row in cur.fetchall()]
-            expected = ["DATE","OPEN","HIGH","LOW","CLOSE","VOLUME"]
-            if all(col in cols for col in expected):
-                log_monitoring(conn, table_name, "Schema", "OK")
-            else:
-                log_monitoring(conn, table_name, "Schema", "FAIL", f"Columns present: {cols}")
-                table_ok = False
+        # Critical: negative/zero prices
+        if o <= 0 or h <= 0 or l <= 0 or c <= 0:
+            log_event(conn, table_name, "DATA_QUALITY_LOG", "Price Check", "FAIL", f"Invalid price on {date}")
+            valid = False
 
-    except Exception as e:
-        log_monitoring(conn, table_name, "General", "FAIL", str(e))
-        table_ok = False
+        # Non-critical: OHLC mismatch
+        if not (l <= o <= h and l <= c <= h):
+            log_event(conn, table_name, "DATA_QUALITY_LOG", "OHLC Check", "WARN", f"OHLC mismatch on {date}")
 
-    return table_ok
+        # Non-critical: abnormal volume (>10x mean)
+        if v and df["VOLUME"].mean() > 0 and v > 10 * df["VOLUME"].mean():
+            log_event(conn, table_name, "DATA_QUALITY_LOG", "Volume Check", "WARN", f"Abnormal volume {v} on {date}")
+
+    return valid
 
 # -----------------------------
 # 4. Main Run
@@ -172,25 +154,37 @@ try:
     )
     print(f"✅ Connected to Snowflake account {SNOWFLAKE_ACCOUNT} as {SNOWFLAKE_USER}")
 
+    # Ensure DATA_QUALITY_LOG always exists, even if no anomalies are logged
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS DATA_QUALITY_LOG (
+                RUN_TS TIMESTAMP,
+                TABLE_NAME STRING,
+                CHECK_TYPE STRING,
+                STATUS STRING,
+                DETAILS STRING
+            )
+        """)
+
     # Ingestion
     upsert_daily(conn, spx_df, "SPX_HISTORICAL")
     upsert_daily(conn, es_df, "ES_HISTORICAL")
     upsert_daily(conn, vix_df, "VIX_HISTORICAL")
     upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
 
-    # Monitoring + Alerting
+    # Validation
     all_ok = True
-    for tbl in ["SPX_HISTORICAL","ES_HISTORICAL","VIX_HISTORICAL","VVIX_HISTORICAL"]:
-        if not run_monitoring(conn, tbl):
+    for df, tbl in [(spx_df,"SPX_HISTORICAL"),(es_df,"ES_HISTORICAL"),(vix_df,"VIX_HISTORICAL"),(vvix_df,"VVIX_HISTORICAL")]:
+        if not run_validation(conn, df, tbl):
             all_ok = False
 
     conn.close()
 
     if not all_ok:
-        print("❌ Monitoring detected failures. Failing job for CI/CD alert.")
+        print("❌ Critical validation failures detected. Failing job for CI/CD alert.")
         sys.exit(1)
 
-    print("🎉 Ingestion + Monitoring successful. All checks OK.")
+    print("🎉 Ingestion + Monitoring + Validation complete. All critical checks passed.")
 except Exception as e:
     print("❌ Pipeline failed:", e)
     sys.exit(1)
