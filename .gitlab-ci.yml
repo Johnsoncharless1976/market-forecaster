@@ -1,22 +1,65 @@
-# # 📄 File: .gitlab-ci.yml  (append this job near the others)
+# 📄 File: .gitlab-ci.yml
 #
 # 📌 Title
-# Zen Council – CI Job for Stage 2.3 VIX Term Structure (post‑Stage 2.2)
+# Zen Council – GitLab CI/CD Pipeline (Daily Ingestion + Derived Metrics + Correlations + VIX Term Structure)
 #
 # 📝 Commit Notes
-# Commit Title: CI: add Stage 2.3 VIX term structure job after correlations
+# Commit Title: CI: align custom stages with GitLab pipeline (add ingest + metrics)
 # Commit Message:
-# - Runs src/ingest_vix_term_structure.py after Stage 2.2.
-# - No external HTTP; expects staged CSV at @FORECASTING_STAGE/vix_term_structure.csv.gz.
-# - Safe to run even if file absent → clear skip message; pipeline flows.
+# - Explicitly defines `ingest` and `metrics` stages alongside GitLab defaults.
+# - Ensures jobs for Stage 2.1, 2.2, 2.3 are recognized and scheduled.
+# - Resolves “chosen stage metrics does not exist” error seen previously.
+# - Pipeline order: ingest → metrics → (then standard build/test/deploy if needed).
 
+stages:
+  - ingest
+  - metrics
+  - build
+  - test
+  - deploy
+
+# Stage 1: Daily Market Data Ingestion
+daily_ingestion:
+  stage: ingest
+  image: python:3.11-slim
+  script:
+    - pip install -r requirements.txt
+    - python src/data_ingestion.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Stage 2.1: Derived Metrics
+stage2_derived_metrics:
+  stage: metrics
+  image: python:3.11-slim
+  needs: ["daily_ingestion"]
+  script:
+    - pip install -r requirements.txt
+    - python src/ingest_derived_metrics.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Stage 2.2: Rolling Correlations
+stage2_rolling_correlations:
+  stage: metrics
+  image: python:3.11-slim
+  needs: ["stage2_derived_metrics"]
+  script:
+    - pip install -r requirements.txt
+    - python src/ingest_correlations.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Stage 2.3: VIX Term Structure
 stage2_vix_term_structure:
   stage: metrics
   image: python:3.11-slim
   needs: ["stage2_rolling_correlations"]
   script:
     - pip install -r requirements.txt
-    - 'test -f src/ingest_vix_term_structure.py || { echo "❌ src/ingest_vix_term_structure.py not found"; exit 1; }'
     - python src/ingest_vix_term_structure.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
