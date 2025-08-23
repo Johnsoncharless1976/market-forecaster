@@ -1,15 +1,12 @@
 """
-Stage 1.1 – Daily OHLCV Ingestion (Deduplication-Safe)
-------------------------------------------------------
-Upgrades ingestion pipeline to:
-- Fetch only the latest daily OHLCV bars (SPX, ES, VIX, VVIX).
-- Ensure Snowflake tables exist with full schema (DATE, OPEN, HIGH, LOW, CLOSE, VOLUME).
-- Delete any overlapping dates before inserting new rows → prevents duplicates.
-- Verify last 5 rows after insert for confidence.
-
-Usage:
-- Designed for daily scheduled runs (period="1d").
-- Can safely be switched to "5d" if desired; deduplication will still hold.
+Stage 1.1 + 1.2 – Daily OHLCV Ingestion with Monitoring (Polished)
+------------------------------------------------------------------
+- Ingest SPX, ES, VIX, VVIX OHLCV daily from Yahoo Finance.
+- Deduplication-safe upsert: removes any overlap in date range before insert.
+- Verify pipeline health (schema, freshness, duplicates).
+- Log verification results into MONITORING_LOG table in Snowflake.
+- Patched Yahoo auto_adjust warning.
+- Patched datetime deprecation warning.
 """
 
 import os
@@ -18,6 +15,7 @@ import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
 import yfinance as yf
 from dotenv import load_dotenv
+from datetime import datetime, UTC
 
 # -----------------------------
 # 1. Load environment variables
@@ -34,7 +32,7 @@ SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
 # -----------------------------
 # 2. Helpers
 # -----------------------------
-def normalize_df(df):
+def normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     """Normalize Yahoo Finance DataFrame into DATE, OPEN, HIGH, LOW, CLOSE, VOLUME."""
     if df is None or df.empty:
         return pd.DataFrame(columns=["DATE","OPEN","HIGH","LOW","CLOSE","VOLUME"])
@@ -54,17 +52,10 @@ def normalize_df(df):
 
     return df.dropna()
 
-def get_spx():
-    return normalize_df(yf.download("^GSPC", period="1d", interval="1d"))
-
-def get_es():
-    return normalize_df(yf.download("ES=F", period="1d", interval="1d"))
-
-def get_vix():
-    return normalize_df(yf.download("^VIX", period="1d", interval="1d"))
-
-def get_vvix():
-    return normalize_df(yf.download("^VVIX", period="1d", interval="1d"))
+def get_spx(): return normalize_df(yf.download("^GSPC", period="1d", interval="1d", auto_adjust=False))
+def get_es():  return normalize_df(yf.download("ES=F", period="1d", interval="1d", auto_adjust=False))
+def get_vix(): return normalize_df(yf.download("^VIX", period="1d", interval="1d", auto_adjust=False))
+def get_vvix():return normalize_df(yf.download("^VVIX", period="1d", interval="1d", auto_adjust=False))
 
 def upsert_daily(conn, df: pd.DataFrame, table_name: str):
     """Delete any rows for the date range being inserted, then reload clean data."""
@@ -87,30 +78,75 @@ def upsert_daily(conn, df: pd.DataFrame, table_name: str):
             )
         """)
         cur.execute(
-            f"DELETE FROM {table_name} WHERE DATE BETWEEN %s AND %s",
-            (min_date, max_date),
+            f"DELETE FROM {table_name} WHERE DATE BETWEEN '{min_date}' AND '{max_date}'"
         )
         print(f"🧹 Removed existing rows in {table_name} from {min_date} → {max_date}")
 
     write_pandas(conn, df.reset_index(drop=True), table_name)
     print(f"✅ Inserted {len(df)} rows into {table_name}")
 
-def verify_table(conn, table_name: str):
-    """Print last 5 rows from a table for verification"""
+# -----------------------------
+# 3. Monitoring Helpers
+# -----------------------------
+def log_monitoring(conn, table_name: str, check_type: str, status: str, details: str = ""):
+    """Insert monitoring results into MONITORING_LOG."""
+    run_ts = datetime.now(UTC)
+
     with conn.cursor() as cur:
-        cur.execute(f"SELECT * FROM {table_name} ORDER BY DATE DESC LIMIT 5")
-        rows = cur.fetchall()
-        print(f"\n📊 Last 5 rows in {table_name}:")
-        for row in rows:
-            print(row)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS MONITORING_LOG (
+                RUN_TS TIMESTAMP, 
+                TABLE_NAME STRING, 
+                CHECK_TYPE STRING, 
+                STATUS STRING, 
+                DETAILS STRING
+            )
+        """)
+        cur.execute(f"""
+            INSERT INTO MONITORING_LOG (RUN_TS, TABLE_NAME, CHECK_TYPE, STATUS, DETAILS)
+            VALUES ('{run_ts}', '{table_name}', '{check_type}', '{status}', '{details}')
+        """)
+
+def run_monitoring(conn, table_name: str):
+    """Run freshness, duplicates, schema checks for a table and log results."""
+    try:
+        with conn.cursor() as cur:
+            # Freshness
+            cur.execute(f"SELECT MAX(DATE) FROM {table_name}")
+            last_date = cur.fetchone()[0]
+            if last_date:
+                log_monitoring(conn, table_name, "Freshness", "OK", f"Last date = {last_date}")
+            else:
+                log_monitoring(conn, table_name, "Freshness", "FAIL", "No rows found")
+
+            # Duplicates
+            cur.execute(f"""
+                SELECT COUNT(*) FROM (
+                    SELECT DATE FROM {table_name} GROUP BY DATE HAVING COUNT(*) > 1
+                )
+            """)
+            dups = cur.fetchone()[0]
+            if dups == 0:
+                log_monitoring(conn, table_name, "Duplicates", "OK")
+            else:
+                log_monitoring(conn, table_name, "Duplicates", "FAIL", f"{dups} duplicate dates found")
+
+            # Schema
+            cur.execute(f"DESC TABLE {table_name}")
+            cols = [row[0] for row in cur.fetchall()]
+            expected = ["DATE","OPEN","HIGH","LOW","CLOSE","VOLUME"]
+            if all(col in cols for col in expected):
+                log_monitoring(conn, table_name, "Schema", "OK")
+            else:
+                log_monitoring(conn, table_name, "Schema", "FAIL", f"Columns present: {cols}")
+
+    except Exception as e:
+        log_monitoring(conn, table_name, "General", "FAIL", str(e))
 
 # -----------------------------
-# 3. Fetch latest daily bars
+# 4. Main Run
 # -----------------------------
-spx_df = get_spx()
-es_df = get_es()
-vix_df = get_vix()
-vvix_df = get_vvix()
+spx_df, es_df, vix_df, vvix_df = get_spx(), get_es(), get_vix(), get_vvix()
 
 print("✅ Data fetched:")
 print("SPX:", spx_df.tail(1))
@@ -118,9 +154,6 @@ print("ES:", es_df.tail(1))
 print("VIX:", vix_df.tail(1))
 print("VVIX:", vvix_df.tail(1))
 
-# -----------------------------
-# 4. Connect + load into Snowflake
-# -----------------------------
 try:
     conn = snowflake.connector.connect(
         user=SNOWFLAKE_USER,
@@ -132,18 +165,18 @@ try:
     )
     print(f"✅ Connected to Snowflake account {SNOWFLAKE_ACCOUNT} as {SNOWFLAKE_USER}")
 
+    # Ingestion
     upsert_daily(conn, spx_df, "SPX_HISTORICAL")
     upsert_daily(conn, es_df, "ES_HISTORICAL")
     upsert_daily(conn, vix_df, "VIX_HISTORICAL")
     upsert_daily(conn, vvix_df, "VVIX_HISTORICAL")
 
-    verify_table(conn, "SPX_HISTORICAL")
-    verify_table(conn, "ES_HISTORICAL")
-    verify_table(conn, "VIX_HISTORICAL")
-    verify_table(conn, "VVIX_HISTORICAL")
+    # Monitoring
+    for tbl in ["SPX_HISTORICAL","ES_HISTORICAL","VIX_HISTORICAL","VVIX_HISTORICAL"]:
+        run_monitoring(conn, tbl)
 
-    print("🎉 Daily SPX, ES, VIX, VVIX OHLCV ingestion complete.")
+    print("🎉 Ingestion + Monitoring complete. Results logged in MONITORING_LOG.")
     conn.close()
 except Exception as e:
-    print("❌ Snowflake load failed:", e)
+    print("❌ Pipeline failed:", e)
     raise
