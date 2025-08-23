@@ -1,17 +1,19 @@
 # 📄 File: .gitlab-ci.yml
 #
 # 📌 Title
-# Zen Council – GitLab CI/CD Pipeline (Daily Ingestion + Stage 2.1 Derived Metrics)
+# Zen Council – GitLab CI/CD Pipeline (Daily Ingestion + Stage 2.1 Derived Metrics + Stage 2.2 Correlations)
 #
 # 📝 Commit Notes
-# Commit Title: CI: add Stage 2.1 derived metrics job post-ingestion
+# Commit Title: CI: integrate Stage 2.1 + Stage 2.2 jobs into unified pipeline
 # Commit Message:
-# - Structured pipeline with two stages: `ingest` and `metrics`.
-# - `daily_ingestion`: runs market data ingestion (src/data_ingestion.py).
-# - `stage2_derived_metrics`: computes and inserts derived metrics (src/ingest_derived_metrics.py).
-# - Dependency enforced via `needs: ["daily_ingestion"]`.
-# - Both jobs restricted to scheduled pipelines on `main` branch.
-# - Ensures derived metrics run immediately after ingestion, idempotent by MERGE logic.
+# - Defines full pipeline: `ingest` → `metrics`.
+# - `daily_ingestion`: runs market data ingestion.
+# - `stage2_derived_metrics`: computes derived metrics (SPX/ES/VIX/VVIX).
+#   * Hardened with preflight checks to fail fast if script missing.
+# - `stage2_rolling_correlations`: computes 10D/20D/60D correlations between symbol pairs.
+# - Dependencies enforced with `needs` → metrics always follow ingestion.
+# - Rules restrict execution to scheduled pipelines on `main` branch.
+# - Single file structure → one commit covers all.
 
 stages:
   - ingest
@@ -34,8 +36,28 @@ stage2_derived_metrics:
   image: python:3.11-slim
   needs: ["daily_ingestion"]
   script:
+    - python -V
     - pip install -r requirements.txt
+    - echo "PWD=$(pwd)"
+    - echo "Repo tree (top level):"
+    - ls -la
+    - echo "Repo tree (src):"
+    - ls -la src || true
+    - 'test -f src/ingest_derived_metrics.py || { echo "❌ src/ingest_derived_metrics.py not found"; exit 1; }'
     - python src/ingest_derived_metrics.py
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# Stage 2.2: Rolling Correlations Calculation
+stage2_rolling_correlations:
+  stage: metrics
+  image: python:3.11-slim
+  needs: ["stage2_derived_metrics"]
+  script:
+    - pip install -r requirements.txt
+    - 'test -f src/ingest_correlations.py || { echo "❌ src/ingest_correlations.py not found"; exit 1; }'
+    - python src/ingest_correlations.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == "main"'
