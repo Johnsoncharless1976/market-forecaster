@@ -2,11 +2,10 @@
 # Stage 1.3 – Daily Ingestion + Monitoring + Alerting
 # -------------------------------------------------------
 # Runs data_ingestion.py (Stage 1.3) once daily via schedule.
-# If monitoring detects a failure, script exits 1 → job fails → CI/CD alert.
-# Can also be run manually on main branch if needed.
+# Uses Python 3.11 image so python command is available.
 #
 # Commit Message:
-# "Stage 1.3: GitLab CI/CD job for daily ingestion + monitoring + alerting"
+# "Stage 1.3: Fix CI/CD job with correct Python image"
 # -------------------------------------------------------
 
 stages:
@@ -14,8 +13,10 @@ stages:
 
 daily_ingestion:
   stage: ingest
+  image: python:3.11
   script:
     - echo "🚀 Running Stage 1.3 – Ingestion + Monitoring + Alerting"
+    - pip install -r requirements.txt
     - python src/data_ingestion.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
