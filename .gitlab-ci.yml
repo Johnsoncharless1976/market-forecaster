@@ -1,63 +1,23 @@
-# 📄 File: .gitlab-ci.yml
+# # 📄 File: .gitlab-ci.yml  (append this job near the others)
 #
 # 📌 Title
-# Zen Council – GitLab CI/CD Pipeline (Daily Ingestion + Stage 2.1 Derived Metrics + Stage 2.2 Correlations)
+# Zen Council – CI Job for Stage 2.3 VIX Term Structure (post‑Stage 2.2)
 #
 # 📝 Commit Notes
-# Commit Title: CI: integrate Stage 2.1 + Stage 2.2 jobs into unified pipeline
+# Commit Title: CI: add Stage 2.3 VIX term structure job after correlations
 # Commit Message:
-# - Defines full pipeline: `ingest` → `metrics`.
-# - `daily_ingestion`: runs market data ingestion.
-# - `stage2_derived_metrics`: computes derived metrics (SPX/ES/VIX/VVIX).
-#   * Hardened with preflight checks to fail fast if script missing.
-# - `stage2_rolling_correlations`: computes 10D/20D/60D correlations between symbol pairs.
-# - Dependencies enforced with `needs` → metrics always follow ingestion.
-# - Rules restrict execution to scheduled pipelines on `main` branch.
-# - Single file structure → one commit covers all.
+# - Runs src/ingest_vix_term_structure.py after Stage 2.2.
+# - No external HTTP; expects staged CSV at @FORECASTING_STAGE/vix_term_structure.csv.gz.
+# - Safe to run even if file absent → clear skip message; pipeline flows.
 
-stages:
-  - ingest
-  - metrics
-
-# Stage 1: Daily Market Data Ingestion
-daily_ingestion:
-  stage: ingest
-  image: python:3.11-slim
-  script:
-    - pip install -r requirements.txt
-    - python src/data_ingestion.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 2.1: Derived Metrics Calculation
-stage2_derived_metrics:
+stage2_vix_term_structure:
   stage: metrics
   image: python:3.11-slim
-  needs: ["daily_ingestion"]
-  script:
-    - python -V
-    - pip install -r requirements.txt
-    - echo "PWD=$(pwd)"
-    - echo "Repo tree (top level):"
-    - ls -la
-    - echo "Repo tree (src):"
-    - ls -la src || true
-    - 'test -f src/ingest_derived_metrics.py || { echo "❌ src/ingest_derived_metrics.py not found"; exit 1; }'
-    - python src/ingest_derived_metrics.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 2.2: Rolling Correlations Calculation
-stage2_rolling_correlations:
-  stage: metrics
-  image: python:3.11-slim
-  needs: ["stage2_derived_metrics"]
+  needs: ["stage2_rolling_correlations"]
   script:
     - pip install -r requirements.txt
-    - 'test -f src/ingest_correlations.py || { echo "❌ src/ingest_correlations.py not found"; exit 1; }'
-    - python src/ingest_correlations.py
+    - 'test -f src/ingest_vix_term_structure.py || { echo "❌ src/ingest_vix_term_structure.py not found"; exit 1; }'
+    - python src/ingest_vix_term_structure.py
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_COMMIT_BRANCH == "main"'
