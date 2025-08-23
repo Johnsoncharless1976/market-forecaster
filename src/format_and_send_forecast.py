@@ -1,16 +1,16 @@
 # 📄 File: src/format_and_send_forecast.py
 #
 # 📌 Title
-# Zen Council – Stage 5 Polished Email Distribution
+# Zen Council – Stage 5 Email with Live Market Data
 #
 # 📝 Commit Notes
-# Commit Title: ETL: upgrade Stage 5 email to match branded forecast style
+# Commit Title: ETL: upgrade Stage 5 email with live SPX/ES/VIX/VVIX values
 # Commit Message:
-# - Formats forecast email with styled sections (Bias, Key Levels, Probable Path, Trade Implications, Context/News, Summary).
-# - Uses emojis/icons and inline CSS for readability across email clients.
-# - Plain-text fallback mirrors same sections for non-HTML clients.
-# - Pulls recipients from FORECAST_RECIPIENTS (DB-driven).
-# - Sends via SMTP if creds configured, else prints in dry-run mode.
+# - Subject line updated with 📌 pin emoji.
+# - SPX label corrected (removed "spot").
+# - Font size bumped by +2 points across the body.
+# - Queries Snowflake for latest SPX, ES, VIX, VVIX closes.
+# - Outputs polished forecast email with live data.
 
 import os
 import pandas as pd
@@ -23,7 +23,7 @@ from datetime import datetime
 
 load_dotenv()
 
-# Required: Snowflake
+# Snowflake creds required
 SNOWFLAKE_VARS = [
     "SNOWFLAKE_USER","SNOWFLAKE_PASSWORD","SNOWFLAKE_ACCOUNT",
     "SNOWFLAKE_WAREHOUSE","SNOWFLAKE_DATABASE","SNOWFLAKE_SCHEMA"
@@ -31,13 +31,14 @@ SNOWFLAKE_VARS = [
 missing = [v for v in SNOWFLAKE_VARS if not os.getenv(v)]
 if missing:
     raise EnvironmentError(f"Missing Snowflake env vars: {', '.join(missing)}")
-
 sf_cfg = {k: os.getenv(k) for k in SNOWFLAKE_VARS}
 
-# Optional: SMTP
+# SMTP creds required
 SMTP_VARS = ["SMTP_HOST","SMTP_PORT","SMTP_USER","SMTP_PASS","EMAIL_SENDER"]
+missing = [v for v in SMTP_VARS if not os.getenv(v)]
+if missing:
+    raise EnvironmentError(f"Missing SMTP env vars: {', '.join(missing)}")
 smtp_cfg = {k: os.getenv(k) for k in SMTP_VARS}
-smtp_enabled = all(smtp_cfg.values())
 
 def fetch_latest_forecast(cur) -> pd.DataFrame:
     cur.execute("""
@@ -59,23 +60,34 @@ def fetch_recipients(cur) -> list:
     cur.execute("SELECT EMAIL, NAME FROM FORECAST_RECIPIENTS WHERE ACTIVE = TRUE")
     return cur.fetchall()
 
-def build_html(forecast: pd.DataFrame, audit: pd.DataFrame) -> str:
+def fetch_market_levels(cur):
+    def latest(symbol_table):
+        cur.execute(f"SELECT DATE, CLOSE FROM {symbol_table} ORDER BY DATE DESC LIMIT 1")
+        row = cur.fetchone()
+        return row[1] if row else "n/a"
+
+    return {
+        "SPX": latest("SPX_HISTORICAL"),
+        "ES": latest("ES_HISTORICAL"),
+        "VIX": latest("VIX_HISTORICAL"),
+        "VVIX": latest("VVIX_HISTORICAL"),
+    }
+
+def build_html(forecast: pd.DataFrame, audit: pd.DataFrame, market: dict) -> str:
     merged = forecast.merge(audit, on=["DATE","INDEX"], how="left")
     run_time = datetime.now().strftime("%b %d, %Y (%I:%M %p ET)")
-
-    # For simplicity, assume single row (SPX)
     row = merged.iloc[0]
 
     html = f"""
     <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #222;">
+      <body style="font-family: Arial, sans-serif; font-size:16px; line-height: 1.6; color: #222;">
         <h2>📌 ZeroDay Zen Forecast – {run_time}</h2>
-        <p style="font-size: 14px; color: #666;">Sent automatically by Zen Market AI</p>
+        <p style="font-size: 13px; color: #666;">Sent automatically by Zen Market AI</p>
 
-        <p><b>SPX Spot:</b> n/a<br>
-           <b>/ES:</b> n/a<br>
-           <b>VIX:</b> n/a<br>
-           <b>VVIX:</b> n/a</p>
+        <p><b>SPX:</b> {market['SPX']}<br>
+           <b>/ES:</b> {market['ES']}<br>
+           <b>VIX:</b> {market['VIX']}<br>
+           <b>VVIX:</b> {market['VVIX']}</p>
 
         <h3>🧭 Bias</h3>
         <p>{row.FORECAST_BIAS}</p>
@@ -108,21 +120,20 @@ def build_html(forecast: pd.DataFrame, audit: pd.DataFrame) -> str:
     """
     return html
 
-def build_plain_text(forecast: pd.DataFrame, audit: pd.DataFrame) -> str:
+def build_plain_text(forecast: pd.DataFrame, audit: pd.DataFrame, market: dict) -> str:
     merged = forecast.merge(audit, on=["DATE","INDEX"], how="left")
     row = merged.iloc[0]
     lines = [
-        "📌 ZeroDay Zen Forecast",
-        f"Date: {datetime.now().strftime('%b %d, %Y %I:%M %p ET')}",
+        f"📌 ZeroDay Zen Forecast – {datetime.now().strftime('%b %d, %Y %I:%M %p ET')}",
         "",
-        "SPX Spot: n/a | /ES: n/a | VIX: n/a | VVIX: n/a",
+        f"SPX: {market['SPX']} | /ES: {market['ES']} | VIX: {market['VIX']} | VVIX: {market['VVIX']}",
         "",
         f"🧭 Bias: {row.FORECAST_BIAS}",
         "🔑 Key Levels: Resistance placeholder / Support placeholder",
         "📊 Probable Path: Base Case / Bear Case / Bull Case placeholders",
         "📐 Trade Implications: Neutral Zone – consider Iron Condor",
         "📰 Context/News: CPI hotter than expected; rate cut odds repriced lower",
-        "✅ Summary: Bias {row.FORECAST_BIAS}, watch volatility cues.",
+        f"✅ Summary: Bias {row.FORECAST_BIAS}, watch volatility cues.",
         "",
         "End of forecast"
     ]
@@ -130,7 +141,7 @@ def build_plain_text(forecast: pd.DataFrame, audit: pd.DataFrame) -> str:
 
 def send_email(html: str, plain: str, recipients: list):
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "ZeroDay Zen Forecast"
+    msg["Subject"] = "📌 ZeroDay Zen Forecast"
     msg["From"] = smtp_cfg["EMAIL_SENDER"]
     msg["To"] = ", ".join([r[0] for r in recipients])
 
@@ -153,21 +164,15 @@ def main():
     forecast = fetch_latest_forecast(cur)
     audit = fetch_latest_audit(cur)
     recipients = fetch_recipients(cur)
+    market = fetch_market_levels(cur)
 
     if forecast.empty or not recipients:
-        print("⚠ No forecast or no recipients. Skipping.")
+        raise RuntimeError("No forecast or no recipients. Aborting email.")
     else:
-        html = build_html(forecast, audit)
-        plain = build_plain_text(forecast, audit)
-        if smtp_enabled:
-            send_email(html, plain, recipients)
-            print(f"✅ Forecast email sent to {len(recipients)} recipients.")
-        else:
-            print("⚠ SMTP not configured. Dry-run mode:")
-            print("\n---- Plain Text ----\n")
-            print(plain)
-            print("\n---- HTML ----\n")
-            print(html)
+        html = build_html(forecast, audit, market)
+        plain = build_plain_text(forecast, audit, market)
+        send_email(html, plain, recipients)
+        print(f"✅ Forecast email sent to {len(recipients)} recipients.")
 
     cur.close(); conn.close()
 
