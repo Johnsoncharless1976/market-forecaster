@@ -1,18 +1,22 @@
-# # 📄 File: .gitlab-ci.yml
+# 📄 File: .gitlab-ci.yml
 #
 # 📌 Title
-# Zen Council – GitLab CI/CD Pipeline (Ingestion + Stage 3.x Forecast, Scoring, Email)
+# Zen Council – Master CI/CD Pipeline (Skeletonized: Stage 4 Active, Others Commented)
 #
 # 📝 Commit Notes
-# Commit Title: CI: declare custom stages (ingest, metrics) and add Stage 3.x jobs
+# Commit Title: CI: skeletonized pipeline with Stage 4 active, all other jobs commented
 # Commit Message:
-# - Added `ingest` and `metrics` stages explicitly so jobs no longer fail with “stage does not exist.”
-# - Keeps default GitLab stages (build, test, deploy).
-# - Stage 3 jobs chained correctly: forecast → score → email.
+# - Preserved all jobs (Stages 1 → 5) in file for visibility and future re-enablement.
+# - Only Stage 4 Audit Loop is active to focus debugging and speed runtime.
+# - Other jobs are commented out, ready to be uncommented when validated.
+# - Ensures single source of truth for pipeline structure, avoids job drift.
 
 stages:
   - ingest
   - metrics
+  - forecast
+  - audit
+  - formatting
   - build
   - test
   - deploy
@@ -23,71 +27,77 @@ default:
     - python -V
     - pip install -r requirements.txt
 
-# Stage 1: Daily Market Data Ingestion
-daily_ingestion:
-  stage: ingest
+# --------------------------
+# ✅ ACTIVE JOB (Stage 4 Audit Loop)
+# --------------------------
+
+stage4_audit_loop:
+  stage: audit
   script:
-    - python src/data_ingestion.py
+    - python src/ingest_audit_loop.py
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "push"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+
+# --------------------------
+# ❌ INACTIVE JOBS (commented out for now)
+# --------------------------
+
+# Stage 1: Daily Market Data Ingestion
+# daily_ingestion:
+#   stage: ingest
+#   script:
+#     - python src/data_ingestion.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # Stage 2.1: Derived Metrics
-stage2_derived_metrics:
-  stage: metrics
-  needs: ["daily_ingestion"]
-  script:
-    - python src/ingest_derived_metrics.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
+# stage2_derived_metrics:
+#   stage: metrics
+#   needs: ["daily_ingestion"]
+#   script:
+#     - python src/ingest_derived_metrics.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # Stage 2.2: Rolling Correlations
-stage2_rolling_correlations:
-  stage: metrics
-  needs: ["stage2_derived_metrics"]
-  script:
-    - python src/ingest_correlations.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
+# stage2_rolling_correlations:
+#   stage: metrics
+#   needs: ["stage2_derived_metrics"]
+#   script:
+#     - python src/ingest_correlations.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
 
 # Stage 2.3: VIX Term Structure
-stage2_vix_term_structure:
-  stage: metrics
-  needs: ["stage2_rolling_correlations"]
-  script:
-    - python src/ingest_vix_term_structure.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
+# stage2_vix_term_structure:
+#   stage: metrics
+#   needs: ["stage2_rolling_correlations"]
+#   script:
+#     - python src/ingest_vix_term_structure.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 3.1: Forecast Job
-stage3_forecast_job:
-  stage: metrics
-  needs: ["stage2_vix_term_structure"]
-  script:
-    - python src/ingest_forecast_job.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
+# Stage 3: Forecast Jobs
+# stage3_forecast_jobs:
+#   stage: forecast
+#   needs: ["stage2_vix_term_structure"]
+#   script:
+#     - python src/ingest_forecast_jobs.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 3.2: Forecast Scoring
-stage3_score_job:
-  stage: metrics
-  needs: ["stage3_forecast_job"]
-  script:
-    - python src/score_forecast_job.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 3.3: Forecast Email Delivery
-stage3_email_job:
-  stage: metrics
-  needs: ["stage3_score_job"]
-  script:
-    - python src/send_forecast_email.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "schedule"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
+# Stage 5: Formatting & Distribution
+# stage5_formatting:
+#   stage: formatting
+#   needs: ["stage4_audit_loop"]
+#   script:
+#     - python src/format_and_send_forecast.py
+#   rules:
+#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
+#     - if: '$CI_COMMIT_BRANCH == "main"'
