@@ -1,0 +1,77 @@
+# ZenMarket AI – Operational Playbook
+
+Last updated: 2025-08-24
+
+This is the daily field manual for running and maintaining ZenMarket AI.
+
+---
+
+## 🚦 Daily Operations
+1. **Pipeline Flow**
+   - Stage 3 → `ingest_forecast_job.py`
+   - Stage 4 → `ingest_audit_loop.py`
+   - Stage 5 → `ingest_forecast_summary.py`
+   - Stage 6 → `format_and_send_forecast.py` (SendGrid)
+
+2. **Artifacts to Check**
+   - `forecast_log.txt` → confirms forecast insert.
+   - `audit_log.txt` → confirms audit loop.
+   - `summary_log.txt` → confirms summary entry.
+
+3. **Email Delivery**
+   - Emails go out via SendGrid API.
+   - Confirm domain authentication (CNAME + DMARC live).
+   - If SendGrid fails → pipeline still runs, logs saved.
+
+---
+
+## 🛠 Troubleshooting
+- **SQL Errors (`invalid identifier`)**  
+  - Run `DESC TABLE <table>` in Snowflake.
+  - Update `schema_codex.md` to match.
+  - Fix script queries accordingly.
+
+- **Pipeline Failures (CI/CD)**  
+  - Check artifacts first.  
+  - If email stage fails, audit/summary may still be valid.  
+
+- **DNS / Email Issues**
+  - Run `nslookup em7473.zenmarketai.com` etc.  
+  - Confirm CNAME and DMARC are propagating.  
+  - Re-run SendGrid verification if needed.
+
+- **Schema Drift**
+  - Update `schema_codex.md` immediately after any `ALTER TABLE`.
+
+---
+
+## ⚓ Guardrail Reminders
+- **No Gmail SMTP** in CI/CD.  
+- **Artifacts mandatory** for forecast, audit, summary.  
+- **Full scripts only** — no snippets in repo.  
+- **Codex sync required** — schemas, repo map, lessons, and guardrails must be current.
+
+---
+
+## 📅 Weekly Maintenance
+- Review `audit_log.txt` for accuracy of forecasts.  
+- Update `lessons.md` with any new mistakes/regrets.  
+- Sync Codex with updated schemas/stages if anything changed.  
+- Check SendGrid dashboard for bounce/spam warnings.  
+
+---
+
+## 🕴 Handoff Checklist
+When handing ZenMarket AI to a new operator:
+1. Walk through `repo_codex.md` (what scripts exist).
+2. Review `schema_codex.md` (what tables exist).
+3. Reiterate guardrails in `guardrails.md`.
+4. Share lessons in `lessons.md`.
+5. Verify pipeline runs clean in GitLab → GitHub → Codex.
+
+---
+
+## ✅ Field Order
+- Data always comes first (Snowflake).  
+- Forecasts must be logged before emails.  
+- No stage is skipped without Council approval.  
