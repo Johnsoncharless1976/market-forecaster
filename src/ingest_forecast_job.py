@@ -1,15 +1,7 @@
-# 📄 File: src/ingest_forecast_job.py
-#
-# 📌 Title
-# Zen Council – Stage 3.1 ZeroDay Zen Forecast ETL
-#
-# 📝 Commit Notes
-# Commit Title: ETL: implement Stage 3.1 ZeroDay Zen daily forecast writer
-# Commit Message:
-# - Pulls latest SPX close, ATR, and RSI proxy from Snowflake tables.
-# - Computes forecast bias (placeholder Neutral), ATM straddle, support/resistance.
-# - MERGE into FORECAST_JOBS for idempotent re-runs.
-# - Prepares foundation for Stage 3.2 auto-scoring and Stage 3.3 email delivery.
+# File: src/ingest_forecast_job.py
+# Title: Stage 3 – Forecast ETL with Timestamp
+# Commit Notes: Added FORECAST_TS = CURRENT_TIMESTAMP to MERGE/INSERT so 
+# each forecast entry carries a timestamp for later stages.
 
 import os
 import snowflake.connector
@@ -46,20 +38,28 @@ def insert_forecast(forecast, cur):
     cur.execute("""
         MERGE INTO FORECAST_JOBS AS T
         USING (SELECT %s DATE, %s INDEX, %s FORECAST_BIAS, %s ATM_STRADDLE,
-                      %s SUPPORT_LEVELS, %s RESISTANCE_LEVELS, %s RSI_CONTEXT, %s NOTES) AS S
+                      %s SUPPORT_LEVELS, %s RESISTANCE_LEVELS, %s RSI_CONTEXT, %s NOTES,
+                      CURRENT_TIMESTAMP FORECAST_TS) AS S
         ON T.DATE = S.DATE AND T.INDEX = S.INDEX
         WHEN MATCHED THEN UPDATE SET
-            FORECAST_BIAS=S.FORECAST_BIAS, ATM_STRADDLE=S.ATM_STRADDLE,
-            SUPPORT_LEVELS=S.SUPPORT_LEVELS, RESISTANCE_LEVELS=S.RESISTANCE_LEVELS,
-            RSI_CONTEXT=S.RSI_CONTEXT, NOTES=S.NOTES, LOAD_TS=CURRENT_TIMESTAMP()
+            FORECAST_BIAS=S.FORECAST_BIAS,
+            ATM_STRADDLE=S.ATM_STRADDLE,
+            SUPPORT_LEVELS=S.SUPPORT_LEVELS,
+            RESISTANCE_LEVELS=S.RESISTANCE_LEVELS,
+            RSI_CONTEXT=S.RSI_CONTEXT,
+            NOTES=S.NOTES,
+            LOAD_TS=CURRENT_TIMESTAMP,
+            FORECAST_TS=S.FORECAST_TS
         WHEN NOT MATCHED THEN INSERT
-            (DATE,INDEX,FORECAST_BIAS,ATM_STRADDLE,SUPPORT_LEVELS,RESISTANCE_LEVELS,RSI_CONTEXT,NOTES)
+            (DATE,INDEX,FORECAST_BIAS,ATM_STRADDLE,SUPPORT_LEVELS,
+             RESISTANCE_LEVELS,RSI_CONTEXT,NOTES,FORECAST_TS)
         VALUES
-            (S.DATE,S.INDEX,S.FORECAST_BIAS,S.ATM_STRADDLE,S.SUPPORT_LEVELS,S.RESISTANCE_LEVELS,S.RSI_CONTEXT,S.NOTES)
+            (S.DATE,S.INDEX,S.FORECAST_BIAS,S.ATM_STRADDLE,S.SUPPORT_LEVELS,
+             S.RESISTANCE_LEVELS,S.RSI_CONTEXT,S.NOTES,S.FORECAST_TS)
     """, (
         forecast["DATE"], forecast["INDEX"], forecast["FORECAST_BIAS"],
-        forecast["ATM_STRADDLE"], forecast["SUPPORT_LEVELS"], forecast["RESISTANCE_LEVELS"],
-        forecast["RSI_CONTEXT"], forecast["NOTES"]
+        forecast["ATM_STRADDLE"], forecast["SUPPORT_LEVELS"],
+        forecast["RESISTANCE_LEVELS"], forecast["RSI_CONTEXT"], forecast["NOTES"]
     ))
 
 def main():
@@ -85,7 +85,7 @@ def main():
 
     insert_forecast(forecast, cur)
     conn.commit(); cur.close(); conn.close()
-    print("✅ Forecast entry inserted into FORECAST_JOBS.")
+    print("✅ Forecast entry inserted into FORECAST_JOBS with timestamp.")
 
 if __name__ == "__main__":
     main()

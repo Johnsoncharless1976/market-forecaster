@@ -1,102 +1,80 @@
-# 📄 File: .gitlab-ci.yml
-#
-# 📌 Title
-# Zen Council – Master CI/CD Pipeline (Skeletonized: Stage 5 Active)
-#
-# 📝 Commit Notes
-# Commit Title: CI: skeletonized pipeline with Stage 5 active, others commented
-# Commit Message:
-# - All stages retained in file for consistency and visibility.
-# - Only Stage 5 formatting/distribution job enabled.
-# - Other jobs commented out to reduce runtime while validating Stage 5.
+# File: .gitlab-ci.yml
+# Title: Stage 6 – Stabilized Pipeline
+# Commit Notes:
+# - Consolidated email job to use format_and_send_forecast.py.
+# - Commented out legacy email jobs (send_forecast_email.py, send_email.py).
+# - Preserved skeleton structure for future stages.
 
 stages:
   - ingest
-  - metrics
+  - derive
   - forecast
   - audit
-  - formatting
-  - build
-  - test
-  - deploy
+  - notify
 
-default:
-  image: python:3.11-slim
-  before_script:
-    - python -V
-    - pip install -r requirements.txt
-
-# --------------------------
-# ✅ ACTIVE JOB (Stage 5 Formatting & Distribution)
-# --------------------------
-
-stage5_formatting:
-  stage: formatting
-  script:
-    - python src/format_and_send_forecast.py
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "push"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-
-# --------------------------
-# ❌ INACTIVE JOBS (commented out for now, retained for later)
-# --------------------------
-
-# Stage 1: Daily Market Data Ingestion
-# daily_ingestion:
+# ------------------------------
+# Stage 1 – Data Ingestion
+# ------------------------------
+# data_ingestion:
 #   stage: ingest
+#   image: python:3.11-slim
 #   script:
+#     - pip install snowflake-connector-python python-dotenv
 #     - python src/data_ingestion.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 2.1: Derived Metrics
-# stage2_derived_metrics:
-#   stage: metrics
-#   needs: ["daily_ingestion"]
+# ------------------------------
+# Stage 2 – Derived Metrics
+# ------------------------------
+# ingest_derived_metrics:
+#   stage: derive
+#   image: python:3.11-slim
 #   script:
+#     - pip install snowflake-connector-python python-dotenv
 #     - python src/ingest_derived_metrics.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# Stage 2.2: Rolling Correlations
-# stage2_rolling_correlations:
-#   stage: metrics
-#   needs: ["stage2_derived_metrics"]
-#   script:
-#     - python src/ingest_correlations.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
+# ------------------------------
+# Stage 3 – Forecast Job
+# ------------------------------
+ingest_forecast_job:
+  stage: forecast
+  image: python:3.11-slim
+  script:
+    - pip install snowflake-connector-python python-dotenv
+    - python src/ingest_forecast_job.py
 
-# Stage 2.3: VIX Term Structure
-# stage2_vix_term_structure:
-#   stage: metrics
-#   needs: ["stage2_rolling_correlations"]
-#   script:
-#     - python src/ingest_vix_term_structure.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 3: Forecast Jobs
-# stage3_forecast_jobs:
-#   stage: forecast
-#   needs: ["stage2_vix_term_structure"]
-#   script:
-#     - python src/ingest_forecast_jobs.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
-
-# Stage 4: Audit Loop
-# stage4_audit_loop:
+# ------------------------------
+# Stage 4 – Audit Loop (placeholder)
+# ------------------------------
+# ingest_audit_loop:
 #   stage: audit
-#   needs: ["stage3_forecast_jobs"]
+#   image: python:3.11-slim
 #   script:
+#     - pip install snowflake-connector-python python-dotenv
 #     - python src/ingest_audit_loop.py
-#   rules:
-#     - if: '$CI_PIPELINE_SOURCE == "schedule"'
-#     - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ------------------------------
+# Stage 5/6 – Unified Forecast Email
+# ------------------------------
+send_forecast_email:
+  stage: notify
+  image: python:3.11-slim
+  script:
+    - pip install snowflake-connector-python python-dotenv
+    - python src/format_and_send_forecast.py
+  only:
+    - main
+  dependencies:
+    - ingest_forecast_job
+
+# ------------------------------
+# Legacy Email Jobs (commented out)
+# ------------------------------
+# send_forecast_email_legacy:
+#   stage: notify
+#   script:
+#     - python src/send_forecast_email.py
+#
+# send_email_legacy:
+#   stage: notify
+#   script:
+#     - python src/send_email.py
