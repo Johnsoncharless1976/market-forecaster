@@ -1,8 +1,8 @@
 # File: src/format_and_send_forecast.py
-# Title: Stage 6 – Forecast Email Delivery (SMTP_HOST fix)
+# Title: Stage 6 – Forecast Email Delivery (Gmail SMTP Fix)
 # Commit Notes:
-# - Aligned to .env where Gmail server is defined as SMTP_HOST, not SMTP_SERVER.
-# - Corrected config mapping so email can connect properly.
+# - Fixed SMTP handshake for Gmail in CI.
+# - Removed manual connect(); added proper EHLO before/after STARTTLS.
 
 import os
 from dotenv import load_dotenv
@@ -20,12 +20,12 @@ cfg = {
     "SNOWFLAKE_WAREHOUSE": os.getenv("SNOWFLAKE_WAREHOUSE"),
     "SNOWFLAKE_DATABASE": os.getenv("SNOWFLAKE_DATABASE"),
     "SNOWFLAKE_SCHEMA": os.getenv("SNOWFLAKE_SCHEMA"),
-    "SMTP_SERVER": os.getenv("SMTP_HOST"),   # ✅ FIXED
-    "SMTP_PORT": os.getenv("SMTP_PORT", "587"),
+    "SMTP_SERVER": os.getenv("SMTP_HOST"),   # Gmail = smtp.gmail.com
+    "SMTP_PORT": int(os.getenv("SMTP_PORT", "587")),
     "SMTP_USER": os.getenv("SMTP_USER"),
     "SMTP_PASS": os.getenv("SMTP_PASS"),
     "EMAIL_SENDER": os.getenv("EMAIL_SENDER"),
-    "EMAIL_TO": os.getenv("EMAIL_TO", os.getenv("SMTP_USER")),  # fallback to self
+    "EMAIL_TO": os.getenv("EMAIL_TO", os.getenv("SMTP_USER")),
 }
 
 def fetch_forecast(cur):
@@ -103,8 +103,10 @@ Notes: {notes}
     msg.attach(MIMEText(plain, "plain"))
     msg.attach(MIMEText(html, "html"))
 
-    with smtplib.SMTP(cfg["SMTP_SERVER"], int(cfg["SMTP_PORT"])) as server:
+    with smtplib.SMTP(cfg["SMTP_SERVER"], cfg["SMTP_PORT"]) as server:
+        server.ehlo()
         server.starttls()
+        server.ehlo()
         server.login(cfg["SMTP_USER"], cfg["SMTP_PASS"])
         server.sendmail(cfg["EMAIL_SENDER"], [cfg["EMAIL_TO"]], msg.as_string())
 
