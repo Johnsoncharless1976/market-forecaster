@@ -1,8 +1,8 @@
 # =========================================================
-# Commit: Comment out broken ingest job
-# - ingest_data.py not found in src/ directory
-# - Job preserved but commented out for audit trail
-# - All other jobs intact and runnable
+# Commit: Add Snowflake credential requirements for notify stage
+# - Added inline reminders for SNOWFLAKE_* variables
+# - Forecast recipients pulled dynamically from Snowflake table
+# - Ensures send_forecast_email job runs clean in CI/CD
 # =========================================================
 
 stages:
@@ -65,6 +65,15 @@ ingest_forecast_job:
 # =========================
 # Stage 4B: Format + Send Forecast
 # Commit Note: Active job – formats & emails forecast
+# Commit Note: Requires SENDGRID_API_KEY + Snowflake creds
+# Required CI/CD variables:
+#   - SENDGRID_API_KEY (masked, protected)
+#   - SNOWFLAKE_USER
+#   - SNOWFLAKE_PASSWORD
+#   - SNOWFLAKE_ACCOUNT
+#   - SNOWFLAKE_WAREHOUSE
+#   - SNOWFLAKE_DATABASE
+#   - SNOWFLAKE_SCHEMA
 # =========================
 send_forecast_email:
   stage: notify
