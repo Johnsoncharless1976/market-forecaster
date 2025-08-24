@@ -1,9 +1,8 @@
 # File: .gitlab-ci.yml
-# Title: Stage 6 – Stabilized Pipeline
+# Title: Stage 6 – Stabilized Pipeline with Audit Artifacts
 # Commit Notes:
-# - Consolidated email job to use format_and_send_forecast.py.
-# - Commented out legacy email jobs (send_forecast_email.py, send_email.py).
-# - Preserved skeleton structure for future stages.
+# - Added artifact logging for Stage 3 (forecast) and Stage 4 (audit).
+# - Artifacts saved for 7 days, downloadable from CI job pages.
 
 stages:
   - ingest
@@ -13,26 +12,6 @@ stages:
   - notify
 
 # ------------------------------
-# Stage 1 – Data Ingestion
-# ------------------------------
-# data_ingestion:
-#   stage: ingest
-#   image: python:3.11-slim
-#   script:
-#     - pip install snowflake-connector-python python-dotenv
-#     - python src/data_ingestion.py
-
-# ------------------------------
-# Stage 2 – Derived Metrics
-# ------------------------------
-# ingest_derived_metrics:
-#   stage: derive
-#   image: python:3.11-slim
-#   script:
-#     - pip install snowflake-connector-python python-dotenv
-#     - python src/ingest_derived_metrics.py
-
-# ------------------------------
 # Stage 3 – Forecast Job
 # ------------------------------
 ingest_forecast_job:
@@ -40,17 +19,27 @@ ingest_forecast_job:
   image: python:3.11-slim
   script:
     - pip install snowflake-connector-python python-dotenv
-    - python src/ingest_forecast_job.py
+    - python src/ingest_forecast_job.py | tee forecast_log.txt
+  artifacts:
+    paths:
+      - forecast_log.txt
+    expire_in: 7 days
 
 # ------------------------------
-# Stage 4 – Audit Loop (placeholder)
+# Stage 4 – Audit Loop
 # ------------------------------
-# ingest_audit_loop:
-#   stage: audit
-#   image: python:3.11-slim
-#   script:
-#     - pip install snowflake-connector-python python-dotenv
-#     - python src/ingest_audit_loop.py
+ingest_audit_loop:
+  stage: audit
+  image: python:3.11-slim
+  script:
+    - pip install snowflake-connector-python python-dotenv
+    - python src/ingest_audit_loop.py | tee audit_log.txt
+  dependencies:
+    - ingest_forecast_job
+  artifacts:
+    paths:
+      - audit_log.txt
+    expire_in: 7 days
 
 # ------------------------------
 # Stage 5/6 – Unified Forecast Email
@@ -59,12 +48,13 @@ send_forecast_email:
   stage: notify
   image: python:3.11-slim
   script:
-    - pip install snowflake-connector-python python-dotenv
+    - pip install snowflake-connector-python python-dotenv requests
     - python src/format_and_send_forecast.py
   only:
     - main
   dependencies:
     - ingest_forecast_job
+    - ingest_audit_loop
 
 # ------------------------------
 # Legacy Email Jobs (commented out)
