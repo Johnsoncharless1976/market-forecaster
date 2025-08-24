@@ -1,9 +1,8 @@
 # =========================================================
-# Commit: Update GitLab CI to use requirements.txt
-# - Replaced manual pip install with pip install -r requirements.txt
-# - Ensures sendgrid + all dependencies are available in runner
-# - Preserved all jobs (inactive ones commented out, not erased)
-# - Added inline commit notes for audit trail
+# Commit: Comment out broken ingest job
+# - ingest_data.py not found in src/ directory
+# - Job preserved but commented out for audit trail
+# - All other jobs intact and runnable
 # =========================================================
 
 stages:
@@ -18,27 +17,28 @@ stages:
 default:
   image: python:3.11-slim
   before_script:
-    # Commit Note: Using pip install -r requirements.txt instead of hard-coded packages
+    # Commit Note: Install dependencies from requirements.txt for consistency
     - python --version
     - pip install --upgrade pip
     - pip install -r requirements.txt
 
 # =========================
-# Stage 1: Ingestion
-# Commit Note: Active job – pulls raw data
+# Stage 1: Ingestion (BROKEN)
+# Commit Note: ingest_data.py missing from src/. Confirm if renamed or deprecated.
+# Commit Note: Job commented out, not deleted, to preserve history.
 # =========================
-ingest_data:
-  stage: ingest
-  script:
-    - python src/ingest_data.py
-  artifacts:
-    paths:
-      - artifacts/ingest/
-    expire_in: 1 week
+# ingest_data:
+#   stage: ingest
+#   script:
+#     - python src/ingest_data.py
+#   artifacts:
+#     paths:
+#       - artifacts/ingest/
+#     expire_in: 1 week
 
 # =========================
 # Stage 1.5: Ingestion Audit
-# Commit Note: Active job – validates data pipeline
+# Commit Note: Valid job – validates ingestion pipeline
 # =========================
 ingest_audit_loop:
   stage: ingest
@@ -79,7 +79,7 @@ send_forecast_email:
 
 # =========================
 # Stage 6: Post-Mortem Audit
-# Commit Note: Inactive for now – left commented for visibility
+# Commit Note: Inactive for now – preserved and commented for toggle later
 # =========================
 # post_mortem_audit:
 #   stage: audit
