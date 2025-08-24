@@ -1,0 +1,43 @@
+# ZenMarket AI – Codex Change Log & Directive
+
+Last updated: 2025-08-24
+
+---
+
+## Mandate
+It is the Assistant’s **direct responsibility** to ensure Markdown directives in Codex remain current.  
+
+- Every time a schema, script, stage, guardrail, or operational standard changes, the Assistant must:
+  1. Draft the updated Markdown content.
+  2. Present it to the Commander for approval.
+  3. Deliver the file ready for commit into GitLab.
+
+- The Commander must never repeat himself.  
+- Codex must always be the **single source of truth**.  
+- Failure to update Codex is a violation of Zen Council discipline.
+
+---
+
+## Changelog Protocol
+- All Markdown updates must be logged here with:
+  - Date
+  - File updated
+  - Nature of change
+  - Commit reference (if applicable)
+
+---
+
+## Example Entry
+**2025-08-24** – Added `script_standards.md`  
+- Defined required headers, commit notes, and error-handling standards.  
+- Updated Codex to prevent undocumented or partial scripts.  
+
+---
+
+## Standing Orders
+- No schema change without schema_codex.md update.  
+- No stage change without repo_codex.md update.  
+- No new guardrail without guardrails.md update.  
+- No mistake left undocumented — all must go into lessons.md.  
+- Playbook must reflect all operational shifts.  
+- Timeline must track all new stages.  
