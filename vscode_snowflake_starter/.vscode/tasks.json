@@ -1,0 +1,14 @@
+﻿{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Snowflake: Test Connection (DEV)",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["src/test_connection.py"],
+      "options": { "envFile": "${workspaceFolder}/.env" },
+      "presentation": { "reveal": "always" },
+      "problemMatcher": []
+    }
+  ]
+}
