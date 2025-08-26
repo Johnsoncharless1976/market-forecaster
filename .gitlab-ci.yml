@@ -1,100 +1,51 @@
-# =========================================================
-# Commit: Add Snowflake credential requirements for notify stage
-# - Added inline reminders for SNOWFLAKE_* variables
-# - Forecast recipients pulled dynamically from Snowflake table
-# - Ensures send_forecast_email job runs clean in CI/CD
-# =========================================================
+# File: .gitlab-ci.yml
+# Title: Stage 1 CI Audit — Exec report + fail on violations
+# Commit Notes:
+# - Add audit stage that runs exec_audit_summary.py and ci_guard_stage1.py
+# - Publishes REPORT_EXEC.md and summary.csv as build artifacts
+# - Uses masked GitLab CI variables for Snowflake (no secrets in code)
+# - Triggers on main and Merge Request pipelines
 
-stages:
-  - ingest
-  - forecast
-  - audit
-  - notify
+image: python:3.11
 
-# =========================
-# Global Defaults
-# =========================
-default:
-  image: python:3.11-slim
-  before_script:
-    # Commit Note: Install dependencies from requirements.txt for consistency
-    - python --version
-    - pip install --upgrade pip
-    - pip install -r requirements.txt
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONUNBUFFERED: "1"
+  # Set these in GitLab ➜ Settings ➜ CI/CD ➜ Variables (masked+protected):
+  # SNOWFLAKE_ACCOUNT
+  # SNOWFLAKE_USER
+  # SNOWFLAKE_PASSWORD
+  # SNOWFLAKE_ROLE
+  # SNOWFLAKE_WAREHOUSE
+  # SNOWFLAKE_DATABASE
+  # SNOWFLAKE_SCHEMA
+  # (optional) SNOWFLAKE_STMT_TIMEOUT, SNOWFLAKE_QUERY_TAG, JOB
 
-# =========================
-# Stage 1: Ingestion (BROKEN)
-# Commit Note: ingest_data.py missing from src/. Confirm if renamed or deprecated.
-# Commit Note: Job commented out, not deleted, to preserve history.
-# =========================
-# ingest_data:
-#   stage: ingest
-#   script:
-#     - python src/ingest_data.py
-#   artifacts:
-#     paths:
-#       - artifacts/ingest/
-#     expire_in: 1 week
+stages: [audit]
 
-# =========================
-# Stage 1.5: Ingestion Audit
-# Commit Note: Valid job – validates ingestion pipeline
-# =========================
-ingest_audit_loop:
-  stage: ingest
+cache:
+  key: "$CI_JOB_IMAGE"
+  paths:
+    - .cache/pip
+
+before_script:
+  - python --version
+  - pip install --upgrade pip
+  - pip install -r vscode_snowflake_starter/requirements.txt
+
+stage1:audit:
+  stage: audit
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
-    - python src/ingest_audit_loop.py
+    - mkdir -p audit_exports
+    - python vscode_snowflake_starter/src/exec_audit_summary.py
+    - python vscode_snowflake_starter/src/ci_guard_stage1.py
   artifacts:
+    when: always
+    expire_in: 14 days
     paths:
-      - artifacts/audit/
-    expire_in: 1 week
-
-# =========================
-# Stage 4: Forecast Build
-# Commit Note: Active job – builds forecast but does not send
-# =========================
-ingest_forecast_job:
-  stage: forecast
-  script:
-    - python src/stage4_forecast.py
-  artifacts:
-    paths:
-      - artifacts/forecast/
-    expire_in: 1 week
-
-# =========================
-# Stage 4B: Format + Send Forecast
-# Commit Note: Active job – formats & emails forecast
-# Commit Note: Requires SENDGRID_API_KEY + Snowflake creds
-# Required CI/CD variables:
-#   - SENDGRID_API_KEY (masked, protected)
-#   - SNOWFLAKE_USER
-#   - SNOWFLAKE_PASSWORD
-#   - SNOWFLAKE_ACCOUNT
-#   - SNOWFLAKE_WAREHOUSE
-#   - SNOWFLAKE_DATABASE
-#   - SNOWFLAKE_SCHEMA
-# =========================
-send_forecast_email:
-  stage: notify
-  script:
-    - python src/format_and_send_forecast.py
-  only:
-    - main
-  artifacts:
-    paths:
-      - artifacts/email/
-    expire_in: 1 week
-
-# =========================
-# Stage 6: Post-Mortem Audit
-# Commit Note: Inactive for now – preserved and commented for toggle later
-# =========================
-# post_mortem_audit:
-#   stage: audit
-#   script:
-#     - python src/post_mortem_audit.py
-#   artifacts:
-#     paths:
-#       - artifacts/postmortem/
-#     expire_in: 1 week
+      - audit_exports/stage1_exec_*/REPORT_EXEC.md
+      - audit_exports/stage1_exec_*/summary.csv

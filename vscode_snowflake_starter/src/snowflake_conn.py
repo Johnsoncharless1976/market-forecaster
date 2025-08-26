@@ -1,43 +1,38 @@
-﻿# File: src/snowflake_conn.py
-# Title: Snowflake Connector (env-driven)
-# Commit Notes:
-# - Loads .env; supports password and externalbrowser auth.
-# - Returns live connection with keep-alive.
 import os
-from dotenv import load_dotenv, find_dotenv
 import snowflake.connector
+from contextlib import contextmanager
 
-load_dotenv(find_dotenv())
+def _env(name, required=True, default=None):
+    v = os.getenv(name, default)
+    if required and (v is None or v == ""):
+        raise RuntimeError(f"Missing required env var: {name}")
+    return v
 
-REQUIRED = [
-    "SNOWFLAKE_ACCOUNT",
-    "SNOWFLAKE_USER",
-    "SNOWFLAKE_ROLE",
-    "SNOWFLAKE_WAREHOUSE",
-    "SNOWFLAKE_DATABASE",
-    "SNOWFLAKE_SCHEMA",
-]
-
-def get_conn():
-    missing = [k for k in REQUIRED if not os.getenv(k)]
-    if missing:
-        raise RuntimeError(f"Missing required environment variables: {missing}")
-
-    auth = os.getenv("SNOWFLAKE_AUTH","password").lower()
-    kwargs = dict(
-        account=os.getenv("SNOWFLAKE_ACCOUNT"),
-        user=os.getenv("SNOWFLAKE_USER"),
-        role=os.getenv("SNOWFLAKE_ROLE"),
-        warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-        database=os.getenv("SNOWFLAKE_DATABASE"),
-        schema=os.getenv("SNOWFLAKE_SCHEMA"),
-        client_session_keep_alive=True,
+def connect_kwargs():
+    kw = dict(
+        account      = _env("SNOWFLAKE_ACCOUNT"),
+        user         = _env("SNOWFLAKE_USER"),
+        password     = _env("SNOWFLAKE_PASSWORD"),
+        role         = _env("SNOWFLAKE_ROLE"),
+        warehouse    = _env("SNOWFLAKE_WAREHOUSE"),
+        database     = _env("SNOWFLAKE_DATABASE"),
+        schema       = _env("SNOWFLAKE_SCHEMA"),
+        application  = "ZenMarketStage1",
+        session_parameters = {
+            "TIMEZONE": "UTC",
+            "STATEMENT_TIMEOUT_IN_SECONDS": _env("SNOWFLAKE_STMT_TIMEOUT", required=False, default="90"),
+            "QUERY_TAG": _env("SNOWFLAKE_QUERY_TAG", required=False, default=_env("JOB", required=False, default="stage1_run")),
+        },
     )
-    if auth == "externalbrowser":
-        kwargs["authenticator"] = "externalbrowser"
-    else:
-        pwd = os.getenv("SNOWFLAKE_PASSWORD")
-        if not pwd:
-            raise RuntimeError("SNOWFLAKE_PASSWORD is required when SNOWFLAKE_AUTH=password")
-        kwargs["password"] = pwd
-    return snowflake.connector.connect(**kwargs)
+    return kw
+
+@contextmanager
+def get_conn():
+    conn = snowflake.connector.connect(**connect_kwargs())
+    try:
+        yield conn
+    finally:
+        try:
+            conn.close()
+        except:
+            pass
