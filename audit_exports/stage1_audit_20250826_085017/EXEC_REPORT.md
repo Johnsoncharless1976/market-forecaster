@@ -1,10 +1,10 @@
-# Stage 1 Audit  Executive Report (20250826_090452)
+# Stage 1 Audit  Executive Report (20250826_091355)
 
 | Check             | Violations | Status |
 |------------------|-----------:|:------:|
-| Duplicates       | 2   | FAIL |
-| Weekend rows     | 2  | FAIL |
-| Nulls in OHLC    | 2  | FAIL |
-| Weekday gaps*    | 2  | FAIL |
+| Duplicates       | 0   | PASS |
+| Weekend rows     | 0  | PASS |
+| Nulls in OHLC    | 0  | PASS |
+| Weekday gaps*    | 0  | PASS |
 
-*Note:* gaps exclude **official NYSE full-day holidays** via HOLIDAYS_NYSE.
+*Note:* gaps exclude **official NYSE full-day holidays** if your HOLIDAYS_NYSE table is present.

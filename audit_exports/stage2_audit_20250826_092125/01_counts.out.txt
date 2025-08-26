@@ -1,0 +1,2 @@
+﻿{'event': 'context', 'database': 'ZEN_MARKET', 'schema': 'FORECASTING'}
+{'error': "001003 (42000): SQL compilation error:\nsyntax error line 2 at position 19 unexpected 'ROWS'."}

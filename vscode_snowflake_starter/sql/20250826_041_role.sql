@@ -1,0 +1,1 @@
+-- Title: Stage 1  Least-priv grants (041_role)\nCREATE ROLE IF NOT EXISTS ZEN_PIPELINE_ROLE;

@@ -1,5 +1,6 @@
 check,violations,status
 duplicates,0,PASS
+null_prices,0,PASS
+ohlc_sanity,0,PASS
+weekday_gaps,27,FAIL
 weekend_rows,0,PASS
-nulls_ohlc,0,PASS
-weekday_gaps,0,PASS
