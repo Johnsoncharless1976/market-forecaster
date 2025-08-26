@@ -1,0 +1,1 @@
+-- Title: Stage 1  Least-priv grants (044_schema)\nGRANT USAGE ON SCHEMA ZEN_MARKET.FORECASTING TO ROLE ZEN_PIPELINE_ROLE;

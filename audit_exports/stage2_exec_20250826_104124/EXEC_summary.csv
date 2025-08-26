@@ -1,0 +1,6 @@
+check,violations,status
+duplicates,0,PASS
+weekend_rows,0,PASS
+nulls_critical,0,PASS
+oob_rsi_atr,0,PASS
+missing_vs_market,173,FAIL
