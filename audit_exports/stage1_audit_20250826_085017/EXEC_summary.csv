@@ -1,0 +1,5 @@
+check,violations,status
+duplicates,2,FAIL
+weekend_rows,2,FAIL
+nulls_ohlc,2,FAIL
+weekday_gaps_holiday_aware,2,FAIL
