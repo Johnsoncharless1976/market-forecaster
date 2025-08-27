@@ -27,10 +27,25 @@ default:
 # Stage 8 QA Guardrails (prevent repeat issues)
 # =========================
 
+# CI Lint Preflight (runs first to prevent YAML/schema breaks)
+ci_lint_preflight:
+  stage: qa-guardrails
+  image: python:3.11-slim
+  before_script: []
+  script:
+    - chmod +x ci/ci_lint_preflight.sh
+    - ./ci/ci_lint_preflight.sh
+  artifacts:
+    paths:
+      - audit_exports/daily/
+    expire_in: 1 week
+  allow_failure: false
+
 # MR-QA-1: Repo Sentinel (fail fast if not canonical)
 repo_sentinel:
   stage: qa-guardrails
   image: alpine:latest
+  needs: ["ci_lint_preflight"]
   before_script: []
   script:
     - echo "🛡️ Repo Sentinel - Verifying canonical repository"
@@ -59,11 +74,13 @@ mirror_and_runner_health:
   image: alpine:latest
   needs: ["repo_sentinel"]
   before_script:
-    - apk add --no-cache curl jq
+    - apk add --no-cache curl jq bc
   script:
     - echo "🔍 Checking mirror and runner health"
     - export AUDIT_DIR="audit_exports/daily/$(date +%Y%m%d_%H%M%S)"
     - mkdir -p ${AUDIT_DIR}
+    - chmod +x ci/kneeboard_slo_tracker.sh
+    - ./ci/kneeboard_slo_tracker.sh
     - |
       cat > ${AUDIT_DIR}/REPO_HEALTH.md << EOF
       # Repository Health Check
