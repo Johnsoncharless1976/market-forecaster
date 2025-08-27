@@ -15,6 +15,12 @@ LINT_OUTPUT=""
 # Basic YAML syntax check
 echo "📋 Checking YAML syntax..."
 if command -v python3 >/dev/null 2>&1; then
+    # Try to install PyYAML if not present
+    if ! python3 -c "import yaml" 2>/dev/null; then
+        echo "📦 Installing PyYAML..."
+        pip install PyYAML >/dev/null 2>&1 || echo "⚠️  Could not install PyYAML"
+    fi
+    
     YAML_CHECK=$(python3 -c "
 import yaml, sys
 try:
@@ -39,9 +45,22 @@ except Exception as e:
         echo "$YAML_CHECK"
     fi
 else
-    echo "⚠️  Python3 not available - skipping YAML validation"
-    WARN_COUNT=$((WARN_COUNT + 1))
-    LINT_OUTPUT="${LINT_OUTPUT}\n⚠️  YAML Validation: Skipped (python3 not found)\n"
+    # Fallback: Basic syntax checks without Python
+    echo "⚠️  Python3 not available - using basic validation"
+    
+    # Check for basic YAML issues
+    if grep -q "^[[:space:]]*:" .gitlab-ci.yml; then
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+        LINT_OUTPUT="${LINT_OUTPUT}\n❌ YAML indentation issue detected\n"
+        echo "❌ YAML indentation issue detected"
+    elif ! grep -q "^[a-zA-Z]" .gitlab-ci.yml; then
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+        LINT_OUTPUT="${LINT_OUTPUT}\n❌ No valid YAML content found\n"
+        echo "❌ No valid YAML content found"
+    else
+        LINT_OUTPUT="${LINT_OUTPUT}\n✅ Basic YAML structure: Valid\n"
+        echo "✅ Basic YAML structure appears valid"
+    fi
 fi
 
 # Basic GitLab CI structure checks
@@ -84,16 +103,19 @@ if [ -n "$DEPRECATED_ONLY" ]; then
     echo "⚠️  Found deprecated 'only:' syntax"
 fi
 
-# Generate CI_LINT.md report
+# Generate CI_LINT.md report with required 5 fields
 cat > "${AUDIT_DIR}/CI_LINT.md" << EOF
 # CI Lint Preflight Report
-**Date**: ${CURRENT_DATE}
-**Repository**: ${CI_PROJECT_PATH}
-**Pipeline**: ${CI_PIPELINE_ID}
+**Project Path**: ${CI_PROJECT_PATH}
+**Project ID**: ${CI_PROJECT_ID}
+**Commit SHA**: ${CI_COMMIT_SHORT_SHA}
+**Error Count**: ${ERROR_COUNT}
+**Warning Count**: ${WARN_COUNT}
+**Result**: $([ $ERROR_COUNT -eq 0 ] && echo "PASS" || echo "FAIL")
 
 ## Summary
-- **Errors**: ${ERROR_COUNT}
-- **Warnings**: ${WARN_COUNT}
+- **Date**: ${CURRENT_DATE}
+- **Pipeline**: ${CI_PIPELINE_ID}
 - **Status**: $([ $ERROR_COUNT -eq 0 ] && echo "✅ PASS" || echo "❌ FAIL")
 
 ## Lint Results
@@ -109,6 +131,10 @@ EOF
 
 echo "📄 CI Lint report: ${AUDIT_DIR}/CI_LINT.md"
 cat "${AUDIT_DIR}/CI_LINT.md"
+
+# Emit required log lines
+echo "LINT_ERRORS=${ERROR_COUNT}"
+echo "RESULT=$([ $ERROR_COUNT -eq 0 ] && echo "PASS" || echo "FAIL")"
 
 # Exit with error if any errors found
 if [ $ERROR_COUNT -gt 0 ]; then
