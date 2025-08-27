@@ -13,10 +13,20 @@ MIRROR_STATUS="not_configured"
 RESULT="UNKNOWN"
 REASON=""
 
-# Check runners using GitLab API
+# Check runners using CI_RUNNER_ID or GitLab API
 echo "🏃 Checking available runners..."
 
-if [ -n "$CI_JOB_TOKEN" ] && [ -n "$CI_API_V4_URL" ]; then
+# Check for negative test switch
+if [ "$FORCE_RUNNER_FAIL" = "true" ]; then
+    RUNNERS_ACTIVE=0
+    REASON="forced_failure_for_test"
+    echo "🔧 FORCE_RUNNER_FAIL=true - simulating runner failure"
+elif [ -n "$CI_RUNNER_ID" ]; then
+    # If CI_RUNNER_ID is set, we have at least one active runner
+    RUNNERS_ACTIVE=1
+    REASON="runner_detected_via_ci_runner_id"
+    echo "✅ Runner detected via CI_RUNNER_ID: $CI_RUNNER_ID"
+elif [ -n "$CI_JOB_TOKEN" ] && [ -n "$CI_API_V4_URL" ]; then
     # Try to get project runners using job token
     RUNNERS_RESPONSE=$(curl -s --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/runners" 2>/dev/null || echo "[]")
@@ -36,14 +46,9 @@ if [ -n "$CI_JOB_TOKEN" ] && [ -n "$CI_API_V4_URL" ]; then
     fi
 else
     echo "⚠️  CI_JOB_TOKEN or CI_API_V4_URL not available"
-    # Fallback: assume runners are active since job is running (unless testing negative scenario)
-    if [ "$CI_COMMIT_SHORT_SHA" = "negative-test-runners" ]; then
-        RUNNERS_ACTIVE=0
-        REASON="simulated_no_runners_for_test"
-    else
-        RUNNERS_ACTIVE=1
-        REASON="assumed_active_job_running"
-    fi
+    # Fallback: assume runners are active since job is running
+    RUNNERS_ACTIVE=1
+    REASON="assumed_active_job_running"
 fi
 
 echo "📊 Found ${RUNNERS_ACTIVE} active runners"
