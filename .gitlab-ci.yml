@@ -212,6 +212,7 @@ viz:
     - when: never
   before_script:
     - pip install -r requirements-viz.txt
+    - apk add --no-cache chromium chromium-chromedriver
   script:
     - |
       if [ "$STAGE_OPEN_6" != "true" ]; then
@@ -220,13 +221,27 @@ viz:
         exit 0
       fi
     - echo "🔄 Stage 6 (visualization) jobs enabled - STAGE_OPEN_6=true"
+    - echo "VIZ_GATED=false"
     - echo "📊 Building Streamlit visualization bundle..."
-    - mkdir -p artifacts/viz
+    - mkdir -p artifacts/viz/screenshots
     - cp app.py artifacts/viz/
     - cp requirements-viz.txt artifacts/viz/
     - cp Makefile artifacts/viz/
-    - echo "VIZ_GATED=false"
-    - echo "✅ Visualization artifact bundle created"
+    - cp README-viz.md artifacts/viz/
+    - |
+      # Create viz bundle zip
+      cd artifacts/viz
+      zip -r viz_bundle.zip . -x "screenshots/*"
+      cd ../..
+    - echo "📸 Generating page screenshots (demo mode)..."
+    - |
+      # Mock screenshot generation (in real deployment would use Selenium/Playwright)
+      echo "Screenshot: Overview page with status lights and guardrails" > artifacts/viz/screenshots/overview.txt
+      echo "Screenshot: Zen Grid with market charts and RSI toggles" > artifacts/viz/screenshots/zen_grid.txt  
+      echo "Screenshot: Forecast vs Actual with live tiles and calibration" > artifacts/viz/screenshots/forecast.txt
+      echo "Screenshot: Evidence explorer with artifact browser" > artifacts/viz/screenshots/evidence.txt
+    - echo "✅ Visualization bundle and screenshots created"
+    - ls -la artifacts/viz/
   artifacts:
     paths:
       - artifacts/viz/

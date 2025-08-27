@@ -19,9 +19,22 @@ st.set_page_config(
 st.sidebar.title("📊 ZenMarket AI")
 page = st.sidebar.selectbox("Navigate", ["Overview", "Zen Grid", "Forecast vs Actual", "Evidence"])
 
+# Check for demo mode
+def is_demo_mode():
+    return os.getenv('VIZ_DEMO', 'false').lower() == 'true' or not all([
+        os.getenv('SNOWFLAKE_USER'),
+        os.getenv('SNOWFLAKE_PASSWORD'),
+        os.getenv('SNOWFLAKE_ACCOUNT'),
+        os.getenv('SNOWFLAKE_ROLE'),
+        os.getenv('SNOWFLAKE_WAREHOUSE')
+    ])
+
 # Snowflake connection helper
 @st.cache_resource
 def get_snowflake_connection():
+    if is_demo_mode():
+        return None
+    
     try:
         conn = snowflake.connector.connect(
             user=os.getenv('SNOWFLAKE_USER'),
@@ -36,6 +49,118 @@ def get_snowflake_connection():
     except Exception as e:
         st.error(f"Snowflake connection failed: {e}")
         return None
+
+# Query market data from Snowflake
+@st.cache_data
+def get_market_data(symbol, days_back=60):
+    conn = get_snowflake_connection()
+    if not conn:
+        # Return mock data for demo mode
+        dates = pd.date_range(end=datetime.now(), periods=days_back, freq='D')
+        base_price = {'^GSPC': 5600, 'ES=F': 5600, '^VIX': 15}[symbol]
+        prices = [base_price + i*2 + (i%10)*5 for i in range(days_back)]
+        return pd.DataFrame({
+            'DATE': dates,
+            'CLOSE': prices,
+            'RSI_14': [50 + (i%20)*2 for i in range(days_back)]
+        })
+    
+    try:
+        cursor = conn.cursor()
+        query = f"""
+        SELECT m.DATE, m.CLOSE, f.RSI_14
+        FROM MARKET_OHLCV m
+        LEFT JOIN FEATURES_DAILY f ON m.DATE = f.DATE AND m.SYMBOL = f.SYMBOL
+        WHERE m.SYMBOL = '{symbol}'
+        AND m.DATE >= DATEADD(day, -{days_back}, CURRENT_DATE())
+        ORDER BY m.DATE DESC
+        LIMIT {days_back}
+        """
+        cursor.execute(query)
+        data = cursor.fetchall()
+        
+        if data:
+            return pd.DataFrame(data, columns=['DATE', 'CLOSE', 'RSI_14'])
+        else:
+            # Fallback to mock data if no results
+            return get_market_data(symbol, days_back)
+    except Exception as e:
+        st.warning(f"Query failed for {symbol}: {e}")
+        return get_market_data(symbol, days_back)
+    finally:
+        cursor.close()
+
+# Get today's forecast data
+@st.cache_data
+def get_forecast_data():
+    conn = get_snowflake_connection()
+    if not conn:
+        # Return mock forecast data
+        return {
+            'bias': '+0.8%',
+            'atm_straddle': '73.2',
+            'realized_vol': '18.4%',
+            'outcome': 'MISS',
+            'miss_tag': 'VOL_SHIFT'
+        }
+    
+    try:
+        cursor = conn.cursor()
+        query = """
+        SELECT FORECAST_BIAS, ATM_STRADDLE, REALIZED_VOL, OUTCOME, MISS_TAG
+        FROM FORECAST_DAILY 
+        WHERE DATE = CURRENT_DATE()
+        LIMIT 1
+        """
+        cursor.execute(query)
+        data = cursor.fetchone()
+        
+        if data:
+            return {
+                'bias': data[0],
+                'atm_straddle': data[1], 
+                'realized_vol': data[2],
+                'outcome': data[3],
+                'miss_tag': data[4]
+            }
+    except Exception as e:
+        st.warning(f"Forecast query failed: {e}")
+    finally:
+        cursor.close()
+    
+    # Fallback to mock data
+    return get_forecast_data()
+
+# Calculate 20-day calibration
+@st.cache_data
+def get_calibration_data():
+    conn = get_snowflake_connection()
+    if not conn:
+        return {'grade': 'GREEN', 'hit_rate': 87.5, 'sample_size': 20}
+    
+    try:
+        cursor = conn.cursor()
+        query = """
+        SELECT 
+            AVG(CASE WHEN OUTCOME = 'HIT' THEN 1.0 ELSE 0.0 END) as HIT_RATE,
+            COUNT(*) as SAMPLE_SIZE
+        FROM FORECAST_DAILY 
+        WHERE DATE >= DATEADD(day, -20, CURRENT_DATE())
+        """
+        cursor.execute(query)
+        data = cursor.fetchone()
+        
+        if data:
+            hit_rate = data[0] * 100
+            grade = 'GREEN' if hit_rate >= 80 else 'YELLOW' if hit_rate >= 60 else 'RED'
+            return {'grade': grade, 'hit_rate': hit_rate, 'sample_size': data[1]}
+    except Exception as e:
+        st.warning(f"Calibration query failed: {e}")
+    finally:
+        cursor.close()
+    
+    # Fallback
+    return get_calibration_data()
 
 # Helper to read audit files
 def read_audit_file(filepath):
@@ -145,36 +270,33 @@ elif page == "Zen Grid":
         days_back = st.selectbox("Time Range", [30, 60], index=1)
         show_rsi = st.checkbox("Show RSI", True)
     
-    # Mock data for now (would connect to Snowflake in production)
-    st.info("📊 Connecting to Snowflake for market data...")
+    # Show demo mode badge if using mock data
+    if is_demo_mode():
+        st.info("🎭 DEMO MODE - Using mock data (set Snowflake credentials for live data)")
+    else:
+        st.info("📊 Connected to Snowflake - Live market data")
     
-    # Create mock charts for ^GSPC, ES=F, ^VIX
+    # Create charts for ^GSPC, ES=F, ^VIX
     symbols = ['^GSPC', 'ES=F', '^VIX']
     
     for symbol in symbols:
         st.subheader(f"📊 {symbol}")
         
-        # Mock price data
-        dates = pd.date_range(end=datetime.now(), periods=days_back, freq='D')
-        prices = pd.DataFrame({
-            'Date': dates,
-            'Close': [4500 + i*2 + (i%10)*5 for i in range(days_back)]
-        })
+        # Get market data (live or mock)
+        market_data = get_market_data(symbol, days_back)
         
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=prices['Date'], 
-            y=prices['Close'],
+            x=market_data['DATE'], 
+            y=market_data['CLOSE'],
             name=f'{symbol} Close',
             line=dict(color='blue')
         ))
         
-        if show_rsi:
-            # Mock RSI data
-            rsi_values = [50 + (i%20)*2 for i in range(days_back)]
+        if show_rsi and 'RSI_14' in market_data.columns:
             fig.add_trace(go.Scatter(
-                x=dates,
-                y=rsi_values,
+                x=market_data['DATE'],
+                y=market_data['RSI_14'],
                 name='RSI-14',
                 yaxis='y2',
                 line=dict(color='orange')
@@ -203,15 +325,23 @@ elif page == "Forecast vs Actual":
     
     col1, col2 = st.columns(2)
     
+    # Show demo mode badge
+    if is_demo_mode():
+        st.info("🎭 DEMO MODE - Using mock forecast data")
+    else:
+        st.info("📊 Connected to Snowflake - Live forecast data")
+    
     with col1:
         st.subheader("📊 Today's Performance")
         
-        # Mock forecast tiles
+        # Get live forecast data
+        forecast = get_forecast_data()
+        
         metrics = [
-            ("Forecast Bias", "+0.3%", "🎯"),
-            ("ATM Straddle", "85.2", "📊"),
-            ("Hit/Miss", "MISS", "❌"),
-            ("Miss Tag", "VOL_SHIFT", "🏷️")
+            ("Forecast Bias", forecast['bias'], "🎯"),
+            ("ATM Straddle", forecast['atm_straddle'], "📊"),
+            ("Hit/Miss", forecast['outcome'], "❌" if forecast['outcome'] == 'MISS' else "✅"),
+            ("Miss Tag", forecast['miss_tag'], "🏷️")
         ]
         
         for metric, value, emoji in metrics:
@@ -220,7 +350,19 @@ elif page == "Forecast vs Actual":
     with col2:
         st.subheader("📈 20-Day Calibration")
         
-        # Mock calibration data
+        # Get live calibration data
+        cal_data = get_calibration_data()
+        
+        # Display calibration banner matching artifact format
+        grade_color = {"GREEN": "success", "YELLOW": "warning", "RED": "error"}
+        grade_emoji = {"GREEN": "✅", "YELLOW": "⚠️", "RED": "❌"}
+        
+        st.metric(
+            f"{grade_emoji.get(cal_data['grade'], '❓')} Calibration Grade",
+            f"{cal_data['grade']} | P(hit)={cal_data['hit_rate']:.1f}% | n={cal_data['sample_size']}"
+        )
+        
+        # Mock calibration chart (would be computed from real data)
         calibration_data = pd.DataFrame({
             'Bin': ['0-20%', '20-40%', '40-60%', '60-80%', '80-100%'],
             'Expected': [0.1, 0.3, 0.5, 0.7, 0.9],
@@ -231,8 +373,15 @@ elif page == "Forecast vs Actual":
                      title="Forecast Calibration", barmode='group')
         st.plotly_chart(fig, use_container_width=True)
     
-    # Recent post-mortems
+    # Recent post-mortems with direct links
     st.subheader("📋 Recent Analysis")
+    
+    # Link to today's post-mortem
+    pm_files = glob.glob("audit_exports/daily/*/POST_MORTEM.md")
+    if pm_files:
+        latest_pm = max(pm_files)
+        st.markdown(f"📄 [Today's Post-Mortem]({latest_pm})")
+    
     weekly_files = glob.glob("audit_exports/weekly/*/WEEKLY_LESSONS.md")
     if weekly_files:
         latest_weekly = max(weekly_files)
