@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  zenmarket-viz:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - STAGE_OPEN_6=${STAGE_OPEN_6:-false}
+      - VIZ_DEMO=${VIZ_DEMO:-true}
+      - VIZ_AUTH_ENABLED=${VIZ_AUTH_ENABLED:-false}
+      - VIZ_AUTH_USER=${VIZ_AUTH_USER}
+      - VIZ_AUTH_PASS=${VIZ_AUTH_PASS}
+      - SNOWFLAKE_USER=${SNOWFLAKE_USER}
+      - SNOWFLAKE_PASSWORD=${SNOWFLAKE_PASSWORD}
+      - SNOWFLAKE_ACCOUNT=${SNOWFLAKE_ACCOUNT}
+      - SNOWFLAKE_ROLE=${SNOWFLAKE_ROLE}
+      - SNOWFLAKE_WAREHOUSE=${SNOWFLAKE_WAREHOUSE}
+    volumes:
+      - ./audit_exports:/app/audit_exports:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

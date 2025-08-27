@@ -7,6 +7,8 @@ import os
 import glob
 import snowflake.connector
 from pathlib import Path
+import base64
+import hashlib
 
 # Page config
 st.set_page_config(
@@ -15,9 +17,80 @@ st.set_page_config(
     layout="wide"
 )
 
+# Authentication check
+def check_auth():
+    if not os.getenv('VIZ_AUTH_ENABLED', 'false').lower() == 'true':
+        return True  # Auth disabled, allow access
+    
+    auth_user = os.getenv('VIZ_AUTH_USER', 'admin')
+    auth_pass = os.getenv('VIZ_AUTH_PASS', 'password')
+    
+    # Check for basic auth header
+    auth_header = st.experimental_get_query_params().get('auth')
+    if auth_header:
+        try:
+            username, password = base64.b64decode(auth_header[0]).decode().split(':')
+            if username == auth_user and password == auth_pass:
+                return True
+        except:
+            pass
+    
+    # Simple password check
+    if 'authenticated' not in st.session_state:
+        st.session_state.authenticated = False
+    
+    if not st.session_state.authenticated:
+        st.title("🔐 ZenMarket AI - Authentication Required")
+        
+        with st.form("auth_form"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login")
+            
+            if submitted:
+                if username == auth_user and password == auth_pass:
+                    st.session_state.authenticated = True
+                    st.success("✅ Authentication successful")
+                    st.experimental_rerun()
+                else:
+                    st.error("❌ Invalid credentials")
+        
+        return False
+    
+    return True
+
+# Access logging
+def log_access(page, user="anonymous"):
+    if not os.getenv('VIZ_AUTH_ENABLED', 'false').lower() == 'true':
+        return  # Skip logging when auth disabled
+        
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
+    audit_dir = f"audit_exports/daily/{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    os.makedirs(audit_dir, exist_ok=True)
+    
+    log_file = f"{audit_dir}/VIZ_ACCESS.md"
+    
+    # Create or append to access log
+    if not os.path.exists(log_file):
+        with open(log_file, 'w') as f:
+            f.write("# Visualization Access Log\\n")
+            f.write(f"**Date**: {timestamp}\\n\\n")
+            f.write("| Timestamp | Page | User |\\n")
+            f.write("|-----------|------|------|\\n")
+    
+    with open(log_file, 'a') as f:
+        f.write(f"| {timestamp} | {page} | {user} |\\n")
+
+# Check authentication
+if not check_auth():
+    st.stop()
+
 # Sidebar navigation
 st.sidebar.title("📊 ZenMarket AI")
 page = st.sidebar.selectbox("Navigate", ["Overview", "Zen Grid", "Forecast vs Actual", "Evidence"])
+
+# Log page access
+log_access(page)
 
 # Check for demo mode
 def is_demo_mode():
