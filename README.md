@@ -1,4 +1,11 @@
-# market-forecaster
+# market-forecaster [DEPRECATED]
+
+**🚨 DEPRECATED — moved to ZenMarket AI: https://gitlab.com/zenmarketai/market-forecaster 🚨**
+
+This repository has been consolidated into the canonical ZenMarket AI project. All future development, issues, and contributions should be directed to the canonical repository.
+
+**Migration Date**: 2025-08-27  
+**Canonical Repository**: https://gitlab.com/zenmarketai/market-forecaster
 
 
 
