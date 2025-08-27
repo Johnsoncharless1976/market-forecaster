@@ -1,0 +1,7 @@
+email_masked,cohort,general_consent,consent_age_days,pm_consent,pm_unsubscribed,send_status,reason,postmortem_gate,send_time,preview_time
+tra***@zenmarket.ai,internal,TRUE,5,TRUE,FALSE,ELIGIBLE,eligible,REQUIRED,17:00_ET,16:45_ET
+ana***@zenmarket.ai,power_user,TRUE,12,TRUE,FALSE,ELIGIBLE,eligible,REQUIRED,17:00_ET,16:45_ET
+ext***@otherfirm.com,external,FALSE,0,FALSE,FALSE,SKIP,no_general_consent,REQUIRED,17:00_ET,16:45_ET
+tri***@example.com,external,TRUE,2,FALSE,FALSE,SKIP,no_pm_consent,REQUIRED,17:00_ET,16:45_ET
+pai***@company.com,external,TRUE,30,TRUE,FALSE,ELIGIBLE,eligible,REQUIRED,17:00_ET,16:45_ET
+unr***@business.com,external,TRUE,15,TRUE,TRUE,SKIP,pm_unsubscribed,REQUIRED,17:00_ET,16:45_ET
