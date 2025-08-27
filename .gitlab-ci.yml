@@ -11,6 +11,7 @@ stages:
   - forecast
   - audit
   - notify
+  - viz
 
 # =========================
 # Global Defaults
@@ -193,6 +194,43 @@ send_forecast_email:
 #     paths:
 #       - artifacts/postmortem/
 #     expire_in: 1 week
+
+# =========================
+# Stage 6: Visualization (MVP)  
+# Commit Note: Stage 6 jobs require STAGE_OPEN_6=true flag
+# Required CI/CD variables (names only, for reference):
+#   - STAGE_OPEN_6 (default: false)
+#   - SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_ACCOUNT
+#   - SNOWFLAKE_ROLE, SNOWFLAKE_WAREHOUSE (for read-only viz)
+# =========================
+viz:
+  stage: viz
+  needs: ["ci_signature"]  
+  rules:
+    - if: $STAGE_OPEN_6 == "true"
+      when: on_success
+    - when: never
+  before_script:
+    - pip install -r requirements-viz.txt
+  script:
+    - |
+      if [ "$STAGE_OPEN_6" != "true" ]; then
+        echo "⏸️ Stage 6 (visualization) jobs skipped - STAGE_OPEN_6 not enabled"
+        echo "VIZ_GATED=true"
+        exit 0
+      fi
+    - echo "🔄 Stage 6 (visualization) jobs enabled - STAGE_OPEN_6=true"
+    - echo "📊 Building Streamlit visualization bundle..."
+    - mkdir -p artifacts/viz
+    - cp app.py artifacts/viz/
+    - cp requirements-viz.txt artifacts/viz/
+    - cp Makefile artifacts/viz/
+    - echo "VIZ_GATED=false"
+    - echo "✅ Visualization artifact bundle created"
+  artifacts:
+    paths:
+      - artifacts/viz/
+    expire_in: 1 week
 
 # =========================
 # Stage 9: Commercial Features (DRAFT ONLY)
