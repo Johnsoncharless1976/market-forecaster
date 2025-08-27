@@ -10,6 +10,12 @@
 
 **Eligibility parity**: PREVIEW=127 | SEND=127 | RESULT=PASS
 
+**Calibration (20d)**: GREEN | P(hit)=87.5% | n=20
+
+**Today**: MISS | Bias=+0.8% | ATM Straddle=73.2 | Realized=18.4% | Miss Tag=VOL_SHIFT
+
+**Pipeline(main)**: PASS | SHA=ec94c2f | time=17:58
+
 ## QA Status
 - CI Lint Preflight: ✅ PASS (0 errors, 1 warnings)
 - Repository Signature: ✅ PASS (hash verified)
