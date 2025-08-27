@@ -71,7 +71,8 @@ stages:
 ## Environment Variables Added
 ### QA Guardrail Variables
 - `CANONICAL_PROJECT_ID`: Project ID for canonical repo verification
-- `CI_SIGNATURE`: Expected SHA256 hash of .gitlab-ci.yml
+- `CI_SIGNATURE`: Expected SHA256 hash of .gitlab-ci.yml  
+  **Current Hash**: `391b9e710ef9e3c076804e663198a434f1796a375188b51d4dd552e10f74f132`
 - `STAGE_OPEN_1`: Enable/disable ingest stage (default: false)
 - `STAGE_OPEN_4`: Enable/disable forecast stage (default: false)
 - `STAGE_OPEN_9`: Enable/disable commercial stage (default: false)  
