@@ -3,10 +3,12 @@
 **Generated**: 2025-08-27 17:36:55 UTC
 
 ## Tag Summary (Last 7 Days)
-- **pipeline_failure**: 3 occurrences
-- **yaml_schema**: 2 occurrences  
-- **runner_health**: 2 occurrences
-- **api_integration**: 1 occurrence
+- **NEWS_EVENT**: 2 occurrences
+- **VOL_SHIFT**: 1 occurrences
+- **TECH_BREAK**: 3 occurrences
+- **DRIFT_DAY**: 1 occurrences
+- **DATA_GAP**: 2 occurrences
+- **UNKNOWN**: 1 occurrences
 
 ## Key Lessons
 1. **YAML Schema Validation**: GitLab CI requires precise job script formatting - complex inline scripts should be extracted to separate shell files

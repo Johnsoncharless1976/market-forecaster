@@ -4,7 +4,11 @@
 ## Latest Reports
 **Guardrails**: PASS | [CI_LINT.md](20250827_170748/CI_LINT.md) | [CI_SIGNATURE.md](20250827_170050/CI_SIGNATURE.md) | [REPO_HEALTH.md](20250827_173409/REPO_HEALTH.md)
 
-**SLO Performance**: AM: PASS @ 09:00 | PM: PASS @ 17:00 | 7-day AM=85.7% PM=92.3% | MACRO_GATE=false
+**SLO Performance**: AM: ✅ PASS @ 09:00 | PM: ❌ FAIL @ 17:00 | 7-day AM=85.7% PM=92.3% | MACRO_GATE=false
+
+**Miss tags (7d)**: NEWS_EVENT=2 | VOL_SHIFT=1 | TECH_BREAK=3 | DRIFT_DAY=1 | DATA_GAP=2 | UNKNOWN=1
+
+**Eligibility parity**: PREVIEW=127 | SEND=127 | RESULT=PASS
 
 ## QA Status
 - CI Lint Preflight: ✅ PASS (0 errors, 1 warnings)
