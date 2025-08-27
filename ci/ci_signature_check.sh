@@ -7,8 +7,15 @@ echo "🔐 CI Signature Check"
 AUDIT_DIR="audit_exports/daily/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "${AUDIT_DIR}"
 
-# Calculate actual hash
-ACTUAL_HASH=$(sha256sum .gitlab-ci.yml | cut -d' ' -f1)
+# Check for negative test switch (WO#5)
+if [ "$FORCE_SIGNATURE_FAIL" = "true" ]; then
+    echo "🔧 FORCE_SIGNATURE_FAIL=true - simulating signature failure"
+    ACTUAL_HASH="00000000000000000000000000000000000000000000000000000000000000"
+else
+    # Calculate actual hash
+    ACTUAL_HASH=$(sha256sum .gitlab-ci.yml | cut -d' ' -f1)
+fi
+
 echo "Actual .gitlab-ci.yml hash: ${ACTUAL_HASH}"
 
 CURRENT_DATE="$(date '+%Y-%m-%d %H:%M:%S UTC')"

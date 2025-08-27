@@ -12,6 +12,13 @@ ERROR_COUNT=0
 WARN_COUNT=0
 LINT_OUTPUT=""
 
+# Check for negative test switch (WO#5)
+if [ "$FORCE_LINT_FAIL" = "true" ]; then
+    ERROR_COUNT=1
+    LINT_OUTPUT="\\n❌ FORCE_LINT_FAIL=true - simulated lint failure for testing\\n"
+    echo "🔧 FORCE_LINT_FAIL=true - simulating lint failure"
+fi
+
 # Basic YAML syntax check
 echo "📋 Checking YAML syntax..."
 if command -v python3 >/dev/null 2>&1; then

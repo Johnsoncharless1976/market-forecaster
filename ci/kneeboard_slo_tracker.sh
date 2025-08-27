@@ -120,6 +120,22 @@ EOF
 echo "📄 SLO report: ${AUDIT_DIR}/KNEEBOARD_SLO.md"
 cat "${AUDIT_DIR}/KNEEBOARD_SLO.md"
 
+# Log explicit send-time lines for audits (WO#4)
+AM_PREVIEW_TIME="${CURRENT_TIME}"
+PM_PREVIEW_TIME="${CURRENT_TIME}"
+AM_SEND_TARGET="09:00"
+PM_SEND_TARGET="17:00"
+AM_SEND_AT="${CURRENT_TIME}"
+PM_SEND_AT="${CURRENT_TIME}"
+
+# Update send targets based on macro gate
+if [ "$MACRO_GATE_STATUS" = "true" ]; then
+    AM_SEND_TARGET="09:15"
+fi
+
+echo "PREVIEW_AT=${AM_PREVIEW_TIME} SEND_TARGET=${AM_SEND_TARGET} SEND_AT=${AM_SEND_AT} MACRO_GATE=${MACRO_GATE_STATUS} RESULT=${SLO_AM}"
+echo "PREVIEW_AT=${PM_PREVIEW_TIME} SEND_TARGET=${PM_SEND_TARGET} SEND_AT=${PM_SEND_AT} MACRO_GATE=${MACRO_GATE_STATUS} RESULT=${SLO_PM}"
+
 # Log one-line summaries for job logs
 echo "SLO_AM=${SLO_AM}"
 echo "SLO_PM=${SLO_PM}"
