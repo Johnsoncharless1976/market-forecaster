@@ -1,0 +1,40 @@
+# CODEOWNERS - ZenMarket AI Repository
+# https://docs.gitlab.com/ee/user/project/codeowners/
+# 
+# These users/groups will be requested for review when changes are made to matching files.
+# Order is important; the last matching pattern takes precedence.
+
+# Global fallback - require review for all changes
+* @zenmarketai/maintainers
+
+# Critical infrastructure files
+/.gitlab-ci.yml @zenmarketai/maintainers @zenmarketai/devops
+/CODEOWNERS @zenmarketai/maintainers
+/requirements.txt @zenmarketai/maintainers
+
+# Source code directories
+/src/ @zenmarketai/maintainers @zenmarketai/developers
+/src/stage4_forecast.py @zenmarketai/maintainers @zenmarketai/forecast-team
+/src/send_email.py @zenmarketai/maintainers @zenmarketai/notification-team
+/src/zen_rules.py @zenmarketai/maintainers @zenmarketai/forecast-team
+
+# SQL and data pipeline files
+/sql/ @zenmarketai/maintainers @zenmarketai/data-team
+/src/*ingest*.py @zenmarketai/maintainers @zenmarketai/data-team
+/src/*audit*.py @zenmarketai/maintainers @zenmarketai/data-team
+
+# Configuration and documentation
+/docs/ @zenmarketai/maintainers @zenmarketai/docs-team
+/*.md @zenmarketai/maintainers
+/audit_exports/ @zenmarketai/maintainers @zenmarketai/audit-team
+
+# Test files
+/tests/ @zenmarketai/maintainers @zenmarketai/developers
+
+# CI/CD and deployment
+/.gitlab/ @zenmarketai/maintainers @zenmarketai/devops
+/ci/ @zenmarketai/maintainers @zenmarketai/devops
+
+# Stage 9 commercial features (requires business approval)
+# Uncomment when stage9-commercial branch is created
+# /src/stage9_*.py @zenmarketai/maintainers @zenmarketai/business-team @zenmarketai/legal-team
