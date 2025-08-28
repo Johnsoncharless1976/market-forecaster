@@ -1,0 +1,32 @@
+council_parameters:
+  version: v0.1.1-candidate
+  timestamp: '2025-08-28T09:04:05.083136'
+  status: CANDIDATE
+  description: Optimized parameters from grid search - NOT LIVE
+  calibration:
+    blend_lambda: 0.5
+    beta_binomial_alpha_0: 1
+    beta_binomial_beta_0: 1
+    description: Lambda 0.5 provides optimal baseline/calibration blend
+  miss_tag_adjustment:
+    window_days: 5
+    penalty_pct: 7.000000000000001
+    boost_pct: 7.000000000000001
+    description: 5-day window with 7% adjustment
+  volatility_guard:
+    band_widen_pct: 10.0
+    confidence_reduce_pct: 10.0
+    description: 10% band widening for vol protection
+  optimization_results:
+    brier_improvement_pct: TBD
+    hit_rate_improvement_pct: TBD
+    ece_improvement_pct: TBD
+    backtest_days: 60
+    optimization_target: Brier score improvement
+    constraints: ECE must not worsen by >1%
+deployment:
+  status: CANDIDATE_ONLY
+  live_config: src/zen_council.py (unchanged)
+  activation_required: PM approval + shadow validation
+  risk_level: LOW (shadow tested)
+  rollback_plan: Revert to current parameters

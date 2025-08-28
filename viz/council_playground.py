@@ -886,8 +886,98 @@ def create_replay_page():
         st.metric("Final p_candidate", "0.534", delta="-0.014 (tuned)")
         st.metric("Hypothetical Result", "DOWN", delta="Hit")
     
-    # What-If panel
-    st.subheader("🔮 What-If Scenarios")
+    # Scenario Cards Section
+    st.subheader("🎯 Scenario Cards (One-Click What-If)")
+    st.info("**Quick Scenarios**: Apply pre-configured parameter sets for common market conditions")
+    
+    card_col1, card_col2, card_col3 = st.columns(3)
+    
+    with card_col1:
+        st.markdown("### 📈 CPI +1.5σ")
+        st.write("**Hot Inflation Print**")
+        st.write("• Macro Z-Score: +1.5")
+        st.write("• Impact: Tighten bands -5%")
+        st.write("• Confidence: +3%")
+        st.write("• News threshold: Lower to 0.25")
+        
+        if st.button("🔥 Apply CPI Hot", key="cpi_hot"):
+            # Apply CPI hot scenario parameters
+            scenario_params = st.session_state.current_params.copy()
+            scenario_params['impact']['macro_threshold'] = 0.8  # More sensitive
+            scenario_params['impact']['band_adjustment'] = 7.0  # Tighter bands
+            scenario_params['impact']['confidence_adjustment'] = 6.0  # Higher confidence
+            scenario_params['impact']['news_threshold'] = 0.25  # Lower news gate
+            scenario_params['council']['vol_widen'] = 10.0  # Tighter vol guard
+            
+            st.session_state.current_params = scenario_params
+            st.session_state.active_scenario = "CPI_HOT_+1.5σ"
+            st.success("✅ CPI +1.5σ scenario applied!")
+            st.info("📊 Macro Z=+1.5, Bands -5%, Conf +3%, News gate 0.25")
+            st.experimental_rerun()
+    
+    with card_col2:
+        st.markdown("### 🕊️ Fed Dovish")
+        st.write("**Unexpectedly Soft Fed**")
+        st.write("• News sentiment: +0.35")
+        st.write("• Impact: Widen bands +3%")
+        st.write("• Confidence: -2%")
+        st.write("• Lambda: More adaptive (0.6)")
+        
+        if st.button("🕊️ Apply Fed Dovish", key="fed_dovish"):
+            # Apply Fed Dovish scenario parameters
+            scenario_params = st.session_state.current_params.copy()
+            scenario_params['council']['lambda'] = 0.6  # More adaptive
+            scenario_params['impact']['news_threshold'] = 0.25  # More sensitive to news
+            scenario_params['impact']['band_adjustment'] = 6.0  # Slightly wider bands
+            scenario_params['impact']['confidence_adjustment'] = 4.0  # Lower confidence
+            scenario_params['council']['vol_widen'] = 15.0  # Standard vol guard
+            
+            st.session_state.current_params = scenario_params
+            st.session_state.active_scenario = "FED_DOVISH"
+            st.success("✅ Fed Dovish scenario applied!")
+            st.info("📊 News +0.35, Bands +3%, Conf -2%, λ=0.6")
+            st.experimental_rerun()
+    
+    with card_col3:
+        st.markdown("### 🔴 Shock Risk-Off")
+        st.write("**Market Panic Mode**")
+        st.write("• News sentiment: -0.45")
+        st.write("• Impact: Widen bands +8%")
+        st.write("• Vol guard: +20% expansion")
+        st.write("• Lambda: Very defensive (0.8)")
+        
+        if st.button("🔴 Apply Risk-Off", key="risk_off"):
+            # Apply Shock Risk-Off scenario parameters
+            scenario_params = st.session_state.current_params.copy()
+            scenario_params['council']['lambda'] = 0.8  # Very defensive
+            scenario_params['impact']['news_threshold'] = 0.20  # Very sensitive
+            scenario_params['impact']['band_adjustment'] = 10.0  # Much wider bands
+            scenario_params['impact']['confidence_adjustment'] = 3.0  # Lower confidence
+            scenario_params['council']['vol_widen'] = 20.0  # Much wider vol guard
+            scenario_params['council']['miss_penalty'] = 12.0  # Higher miss penalty
+            
+            st.session_state.current_params = scenario_params
+            st.session_state.active_scenario = "SHOCK_RISK_OFF"
+            st.success("✅ Shock Risk-Off scenario applied!")
+            st.info("📊 News -0.45, Bands +8%, Vol +20%, λ=0.8")
+            st.experimental_rerun()
+    
+    # Show active scenario status
+    if 'active_scenario' in st.session_state:
+        st.success(f"🎯 **Active Scenario**: {st.session_state.active_scenario}")
+        if st.button("🔄 Reset to Baseline"):
+            # Reset to baseline parameters
+            engine = PlaygroundEngine()
+            st.session_state.current_params = engine.load_current_settings()
+            if 'active_scenario' in st.session_state:
+                del st.session_state.active_scenario
+            st.success("✅ Reset to baseline parameters")
+            st.experimental_rerun()
+    
+    st.divider()
+    
+    # What-If panel (existing functionality)
+    st.subheader("🔮 Manual What-If Testing")
     
     whatif_col1, whatif_col2 = st.columns(2)
     
@@ -925,6 +1015,9 @@ def create_replay_page():
             
             replay_file = audit_dir / f'REPLAY_RUN_{timestamp}.md'
             
+            # Get active scenario if any
+            active_scenario = st.session_state.get('active_scenario', 'None')
+            
             replay_content = f"""# Council Replay Run
 
 **Replay Date**: {selected_date}
@@ -940,6 +1033,10 @@ def create_replay_page():
 - **Candidate Final**: 0.534 (tuned parameters)
 - **Hypothetical Result**: DOWN (hit)
 - **Improvement**: Better calibration
+
+## Scenario Cards Applied
+- **Active Scenario**: {active_scenario}
+- **Scenario Effects**: {'Pre-configured parameter set applied' if active_scenario != 'None' else 'Baseline parameters used'}
 
 ## What-If Scenarios Applied
 - **Macro Surprise**: {surprise_type} z={surprise_z:+.1f}

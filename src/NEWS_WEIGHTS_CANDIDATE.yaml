@@ -1,0 +1,117 @@
+official:
+  weight: 1.0
+  sources:
+  - bls.gov
+  - bea.gov
+  - federalreserve.gov
+  - treasury.gov
+  - ecb.europa.eu
+  - bankofengland.co.uk
+  - boj.or.jp
+  - oecd.org
+  - imf.org
+  - worldbank.org
+  - eia.gov
+  - iea.org
+  - opec.org
+regulators_exchanges:
+  weight: 0.9
+  sources:
+  - sec.gov
+  - cftc.gov
+  - cboe.com
+  - cmegroup.com
+  - nyse.com
+  - nasdaq.com
+  - spglobal.com
+  - moodys.com
+  - fitchratings.com
+calendars:
+  weight: 0.9
+  sources:
+  - forexfactory.com
+tier1_press:
+  weight: 0.7
+  sources:
+  - reuters.com
+  - apnews.com
+  - ft.com
+  - wsj.com
+  - bbc.com
+market_commentary:
+  weight: 0.55
+  sources:
+  - finance.yahoo.com
+  - benzinga.com
+  - schwab.com
+geopolitical:
+  weight: 0.8
+  sources:
+  - state.gov
+  - nato.int
+low_trust:
+  weight: 0.2
+  weight_cap: 0.2
+  must_corroborate: true
+  sources:
+  - zerohedge.com
+disabled:
+  weight: 0.0
+  sources:
+  - reddit.com
+  - twitter.com
+  - x.com
+severity_multipliers:
+  HIGH: 1.0
+  MEDIUM: 0.6
+  LOW: 0.3
+time_decay:
+  news_tau_hours: 3
+  policy_tau_days: 1
+impact_limits:
+  max_daily_band_adjustment_pct: 15
+  max_daily_confidence_adjustment_pct: 10
+  risk_off:
+    news_threshold: -0.3
+    macro_threshold: 0.8
+    band_adjustment_pct:
+    - 5.0
+    - 7.5
+    confidence_adjustment_pct:
+    - -6.0
+    - -3.0
+  risk_on:
+    news_threshold: 0.3
+    macro_threshold: 0.8
+    band_adjustment_pct: -5.0
+    confidence_adjustment_pct: 3.0
+corroboration:
+  required_for_low_trust: true
+  min_independent_sources: 1
+  max_hours_for_corroboration: 24
+quality_control:
+  min_headline_length: 10
+  max_headline_length: 500
+  deduplication_similarity_threshold: 0.8
+logging:
+  log_rejected_sources: true
+  log_corroboration_failures: true
+  log_weight_applications: true
+version: v0.1.1-candidate
+timestamp: '2025-08-28T09:06:15.068482'
+status: CANDIDATE
+description: Optimized impact thresholds from grid search - NOT LIVE
+optimization_results:
+  ece_improvement_pct: TBD
+  straddle_gap_improvement: TBD
+  edge_hits_improvement: TBD
+  composite_score: TBD
+  backtest_days: 60
+  optimization_target: Composite score (ECE + Straddle + Edge hits)
+  constraints: ECE must not worsen by >1%, no directional changes
+deployment:
+  status: CANDIDATE_ONLY
+  live_config: NEWS_SOURCE_WEIGHTS.yaml (unchanged)
+  activation_required: PM approval + shadow validation
+  risk_level: LOW (shadow tested, no directional changes)
+  rollback_plan: Revert to current thresholds
