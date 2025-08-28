@@ -290,8 +290,18 @@ def main():
         layout="wide"
     )
     
+    # Quick Links Top Bar
+    link_col1, link_col2, link_col3, link_col4 = st.columns(4)
+    with link_col1:
+        st.markdown("🏠 [Live Dashboard](http://localhost:8501)")
+    with link_col2:
+        st.markdown("🎮 [Playground](http://localhost:8502)")
+    with link_col3:
+        st.markdown("⏮️ [Replay](http://localhost:8502)")
+    with link_col4:
+        st.markdown("📋 [Evidence](./audit_exports/daily/)")
+    
     st.title("🧠 Zen Council v0.1")
-    st.info("🎮 **New**: [Council Playground](http://localhost:8502) - Live parameter tuning + replay (candidate-only)")
     
     # Load data first to check shadow mode
     try:
