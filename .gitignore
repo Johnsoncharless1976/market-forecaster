@@ -63,3 +63,4 @@ stage7/
 *.swp
 *.swo
 *~
+.claude/settings.local.json
