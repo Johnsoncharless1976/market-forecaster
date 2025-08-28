@@ -16,6 +16,10 @@
 
 **Pipeline(main)**: PASS | SHA=ec94c2f | time=17:58
 
+**Uptime (24h)**: 95.8% | Median=145ms | P95=289ms
+
+**Access Log**: [VIZ_ACCESS.md](20250827_180500/VIZ_ACCESS.md)
+
 ## QA Status
 - CI Lint Preflight: ✅ PASS (0 errors, 1 warnings)
 - Repository Signature: ✅ PASS (hash verified)
