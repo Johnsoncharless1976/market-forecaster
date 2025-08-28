@@ -11,3 +11,22 @@ data/*.parquet
 
 # OS/Jupyter
 .DS_Store
+
+# Audit & Generated Artifacts
+audit_exports/daily/**
+audit_exports/weekly/**
+audit_exports/cohorts/**/SHADOW_SCORECARD*.md
+artifacts/**
+candidate_packs/**
+viz_bundle.zip
+**/*.zip
+
+# Screenshots & Evidence
+**/screenshots/*.png
+**/PILOT_DECISION_LOG.csv
+**/EMAIL_ENHANCE_PROOF.md
+**/NEWS_FEED_LOG.md
+**/MACRO_EVENTS.md
+**/NEWS_SCORE.md
+**/LEVEL_MAGNETS.md
+**/WIN_GATE*.md

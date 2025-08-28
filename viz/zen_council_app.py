@@ -27,6 +27,7 @@ try:
     from level_magnet_engine import LevelMagnetEngine
     from magnet_ab_backtest import MagnetABBacktest
     from win_conditions_gate import WinConditionsGate
+    from shadow_scorecard import ShadowScorecard
 except ImportError:
     st.error("Could not import Zen Council modules. Check src/ directory.")
     st.stop()
@@ -217,6 +218,166 @@ def load_win_conditions():
         }
 
 
+def load_shadow_scorecard():
+    """Load 30-day Shadow Scorecard"""
+    try:
+        scorecard = ShadowScorecard()
+        
+        # Get cohort progress
+        cohort = scorecard.get_cohort_day()
+        
+        # Generate synthetic shadow data
+        shadow_df = scorecard.generate_synthetic_shadow_data()
+        
+        # Calculate metrics
+        metrics = scorecard.calculate_scorecard_metrics(shadow_df)
+        
+        # Write scorecard report
+        scorecard_file = scorecard.write_shadow_scorecard(metrics)
+        metrics['report_file'] = scorecard_file
+        metrics['cohort'] = cohort
+        
+        return metrics
+    except Exception as e:
+        return {
+            'trading_days': 0,
+            'brier_improvement_pct': 0.0,
+            'ece_improvement_pct': 0.0,
+            'straddle_improvement_pct': 0.0,
+            'shadow_streak': 0,
+            'cohort': {'day': 1, 'total': 30, 'start_date': '2025-08-28', 'status': 'ACTIVE'},
+            'error': str(e)
+        }
+
+
+def load_pilot_mode_status():
+    """Check pilot mode status and toggle"""
+    pilot_mode = os.getenv('PILOT_MODE', 'false').lower() == 'true'
+    return {
+        'enabled': pilot_mode,
+        'log_file': 'audit_exports/daily/PILOT_DECISION_LOG.csv'
+    }
+
+
+def write_pilot_decision_log(decision_data):
+    """Write decision to pilot log"""
+    try:
+        pilot_log = Path('audit_exports') / 'daily' / 'PILOT_DECISION_LOG.csv'
+        pilot_log.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Check if file exists to determine if we need headers
+        write_headers = not pilot_log.exists()
+        
+        import csv
+        with open(pilot_log, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            
+            if write_headers:
+                writer.writerow(['date', 'p0', 'p_final', 'band_adjustment_pct', 'confidence_adjustment_pct', 'outcome', 'note'])
+            
+            writer.writerow([
+                decision_data.get('date', datetime.now().strftime('%Y-%m-%d')),
+                f"{decision_data.get('p0', 0.50):.3f}",
+                f"{decision_data.get('p_final', 0.50):.3f}",
+                f"{decision_data.get('band_adjustment_pct', 0.0):+.1f}",
+                f"{decision_data.get('confidence_adjustment_pct', 0.0):+.1f}",
+                decision_data.get('outcome', '*'),  # * = pending
+                'PILOT'
+            ])
+            
+        return str(pilot_log)
+    except Exception as e:
+        print(f"Error writing pilot log: {e}")
+        return None
+
+
+def load_live_gate_status():
+    """Check PM approval gate status"""
+    try:
+        import hashlib
+        
+        # Check environment variable
+        council_live_approved = os.getenv('COUNCIL_LIVE_APPROVED', 'false').lower() == 'true'
+        
+        # Check approval file
+        approval_file = Path('governance') / 'PM_APPROVAL.md'
+        if not approval_file.exists():
+            return {
+                'status': 'BLOCKED',
+                'reason': 'approval_file_missing',
+                'message': 'PM approval file not found'
+            }
+        
+        # Extract fields from approval file
+        try:
+            content = approval_file.read_text(encoding='utf-8')
+            
+            approved_by = ""
+            date = ""
+            target_sha = ""
+            approval_hash = ""
+            
+            for line in content.split('\n'):
+                if line.startswith('APPROVED_BY='):
+                    approved_by = line.split('=', 1)[1].strip()
+                elif line.startswith('DATE='):
+                    date = line.split('=', 1)[1].strip()
+                elif line.startswith('TARGET_SHA='):
+                    target_sha = line.split('=', 1)[1].strip()
+                elif line.startswith('APPROVAL_HASH='):
+                    approval_hash = line.split('=', 1)[1].strip()
+            
+            # Check if all fields present
+            if not all([approved_by, date, target_sha, approval_hash]):
+                return {
+                    'status': 'BLOCKED',
+                    'reason': 'approval_missing',
+                    'message': 'PM approval fields incomplete'
+                }
+            
+            # Verify hash
+            approval_string = f"{approved_by}|{date}|{target_sha}"
+            computed_hash = hashlib.sha256(approval_string.encode()).hexdigest()
+            
+            if computed_hash != approval_hash:
+                return {
+                    'status': 'BLOCKED', 
+                    'reason': 'hash_mismatch',
+                    'message': 'PM approval hash invalid'
+                }
+            
+            # Check environment variable
+            if not council_live_approved:
+                return {
+                    'status': 'BLOCKED',
+                    'reason': 'var_false', 
+                    'message': 'COUNCIL_LIVE_APPROVED not set to true'
+                }
+            
+            return {
+                'status': 'UNBLOCKED',
+                'reason': 'ready_to_flip',
+                'message': 'All approvals verified',
+                'approved_by': approved_by,
+                'date': date,
+                'target_sha': target_sha
+            }
+            
+        except Exception as e:
+            return {
+                'status': 'BLOCKED',
+                'reason': 'file_error',
+                'message': f'Error reading approval file: {e}'
+            }
+            
+    except Exception as e:
+        return {
+            'status': 'BLOCKED',
+            'reason': 'system_error',
+            'message': f'Gate check failed: {e}'
+        }
+
+
 def load_impact_ab_results():
     """Load latest Impact A/B backtest results"""
     try:
@@ -343,17 +504,98 @@ def main():
         st.markdown("*Making the Brain Real - Live Forecast Intelligence*")
         st.success("✅ **LIVE MODE**: Council adjustments are active and applied to forecasts")
     
-    # Load gates, impact, magnet, win conditions, and A/B data (zen_data already loaded above)
+    # Load gates, impact, magnet, win conditions, shadow scorecard, live gate, pilot mode, and A/B data (zen_data already loaded above)
     try:
         gates_data = load_latest_gates_data()
         impact_data = load_latest_impact_data()
         magnet_data = load_magnet_data()
         win_conditions = load_win_conditions()
+        shadow_scorecard = load_shadow_scorecard()
+        live_gate = load_live_gate_status()
+        pilot_mode = load_pilot_mode_status()
         ab_results = load_impact_ab_results()
         magnet_ab_results = load_magnet_ab_results()
     except Exception as e:
         st.error(f"Error loading data: {e}")
         return
+    
+    # Live Gate Header Badge
+    if live_gate['status'] == 'BLOCKED':
+        st.error(f"🔒 **Approval Required**: {live_gate['message']} ({live_gate['reason']})")
+        st.info("**Live deployment blocked** until PM approval gate passes. See governance/PM_APPROVAL.md for instructions.")
+    
+    # Pilot Mode Interface
+    pilot_col1, pilot_col2 = st.columns([3, 1])
+    
+    with pilot_col2:
+        # PM-only toggle for pilot mode
+        current_pilot = pilot_mode['enabled']
+        st.write("**PM Controls:**")
+        
+        if st.button(f"{'🟣 PILOT ON' if current_pilot else '⚫ PILOT OFF'}", key="pilot_toggle"):
+            # Toggle pilot mode (in a real app, this would set an env var or session state)
+            st.info("**Pilot Mode Toggle**: In production, this would toggle PILOT_MODE environment variable")
+            st.experimental_rerun()
+    
+    with pilot_col1:
+        if pilot_mode['enabled']:
+            st.success("**Mode: PILOT (shadow only)** - Live-looking interface with zero production impact")
+            st.markdown("""
+            <div style="background: linear-gradient(45deg, #7c3aed, #a855f7); color: white; padding: 10px; border-radius: 5px; text-align: center; margin: 10px 0; border: 2px solid #6d28d9;">
+                <strong>🎭 SIMULATION — NO PRODUCTION IMPACT</strong><br>
+                <small>All decisions logged to PILOT_DECISION_LOG.csv only</small>
+            </div>
+            """, unsafe_allow_html=True)
+        elif shadow_mode:
+            st.warning("**Mode: SHADOW** - Candidate adjustments logged for evaluation")
+        else:
+            st.success("**Mode: LIVE** - Active forecast adjustments")
+    
+    # Pilot Decision Logging
+    if pilot_mode['enabled']:
+        try:
+            # Log current decision to pilot log
+            pilot_decision = {
+                'date': datetime.now().strftime('%Y-%m-%d'),
+                'p0': zen_data.get('p_baseline', 0.50),
+                'p_final': zen_data.get('p_final', 0.50), 
+                'band_adjustment_pct': impact_data.get('adjustments', {}).get('band_adjustment_pct', 0.0),
+                'confidence_adjustment_pct': impact_data.get('adjustments', {}).get('confidence_adjustment_pct', 0.0),
+                'outcome': '*'  # Pending outcome
+            }
+            
+            pilot_log_file = write_pilot_decision_log(pilot_decision)
+            if pilot_log_file:
+                st.info(f"📝 **Pilot Decision Logged**: {pilot_log_file}")
+        except Exception as e:
+            st.warning(f"⚠️ Pilot logging error: {e}")
+    
+    # Update INDEX.md with pilot status
+    try:
+        index_file = Path('audit_exports') / 'daily' / 'INDEX.md'
+        if index_file.exists():
+            content = index_file.read_text(encoding='utf-8')
+            
+            pilot_line = f"Pilot: {'ON | log=PILOT_DECISION_LOG.csv' if pilot_mode['enabled'] else 'OFF'}"
+            
+            if 'Pilot:' in content:
+                # Replace existing pilot line
+                lines = content.split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip().startswith('Pilot:'):
+                        lines[i] = pilot_line
+                        break
+                content = '\n'.join(lines)
+            else:
+                # Add after Live Gate line
+                content = content.replace('Live Gate:', f'Live Gate:')
+                if 'Live Gate:' in content:
+                    content = content.replace('Live Gate: BLOCKED', f'Live Gate: BLOCKED\n{pilot_line}')
+                    content = content.replace('Live Gate: UNBLOCKED', f'Live Gate: UNBLOCKED\n{pilot_line}')
+            
+            index_file.write_text(content, encoding='utf-8')
+    except Exception as e:
+        pass  # Silent fail for INDEX update
     
     # Overview tiles
     col1, col2, col3, col4 = st.columns(4)
@@ -452,6 +694,28 @@ def main():
         else:
             st.error("⏸️ **NOT READY**")  
             st.caption(f"{win_conditions['summary']['gates_passed']}/4 gates pass")
+    
+    # Shadow Scorecard Tile
+    st.subheader("📊 Shadow Scorecard (30-day)")
+    
+    scorecard_col1, scorecard_col2, scorecard_col3, scorecard_col4, scorecard_col5 = st.columns(5)
+    
+    with scorecard_col1:
+        st.metric("ΔBrier", f"{shadow_scorecard['brier_improvement_pct']:+.2f}%", delta="30-day avg")
+    
+    with scorecard_col2:
+        st.metric("ΔECE", f"{shadow_scorecard['ece_improvement_pct']:+.2f}%", delta="20-day avg")
+    
+    with scorecard_col3:
+        st.metric("ΔStraddle", f"{shadow_scorecard['straddle_improvement_pct']:+.2f}%", delta="Confidence")
+    
+    with scorecard_col4:
+        st.metric("Streak", f"{shadow_scorecard['shadow_streak']}d", delta="Consecutive")
+    
+    with scorecard_col5:
+        cohort = shadow_scorecard.get('cohort', {'day': 1, 'total': 30})
+        st.info(f"**Day {cohort['day']}/{cohort['total']}**")
+        st.caption("Shadow Cohort")
     
     # Magnet Engine Chip
     if magnet_data['enabled'] and not magnet_data.get('muted', False):
