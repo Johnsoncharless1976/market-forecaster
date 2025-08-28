@@ -291,6 +291,7 @@ def main():
     )
     
     st.title("🧠 Zen Council v0.1")
+    st.info("🎮 **New**: [Council Playground](http://localhost:8502) - Live parameter tuning + replay (candidate-only)")
     
     # Load data first to check shadow mode
     try:
@@ -432,11 +433,13 @@ def main():
     
     # Tuning Mode Display
     st.write("**Tuning Mode: OFFLINE** | Best λ=0.5, α₀/β₀=1/1, |s| gate=0.30, |z| gate=0.8 (candidate only)")
-    tuning_col1, tuning_col2 = st.columns(2)
+    tuning_col1, tuning_col2, tuning_col3 = st.columns(3)
     with tuning_col1:
         st.markdown("📊 [COUNCIL_TUNING.md](../audit_exports/tuning/)")
     with tuning_col2:
         st.markdown("🎯 [IMPACT_TUNING.md](../audit_exports/tuning/)")
+    with tuning_col3:
+        st.markdown("🎮 [Playground](http://localhost:8502) - Live tuning")
     
     # Mute Status Check
     if impact_data.get('muted', False):
