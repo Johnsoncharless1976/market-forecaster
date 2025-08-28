@@ -1,0 +1,30 @@
+preset_name: "Risk-Off"
+description: "Defensive positioning for market stress periods"
+status: "CANDIDATE_ONLY"
+
+council_parameters:
+  blend_lambda: 0.75  # More conservative blend
+  beta_binomial_alpha_0: 3
+  beta_binomial_beta_0: 3
+  miss_penalty_pct: 12.0  # Higher penalty for misses
+  vol_guard_widen_pct: 20.0  # Wider bands
+
+impact_thresholds:
+  news_threshold: 0.30  # Standard risk-off trigger
+  macro_threshold: 0.9   # Lower threshold for macro events
+  band_adjustment_pct: 7.0   # Wider bands
+  confidence_adjustment_pct: 3.0  # Lower confidence
+
+magnet_engine:
+  enabled: false  # Disable magnet during stress
+  gamma: 0.0
+  beta: 0.0
+
+source_weights:
+  wsj: 0.95      # Trust tier-1 sources more
+  reuters: 0.90
+  benzinga: 0.25  # Reduce market commentary weight
+  schwab: 0.20
+  zerohedge_cap: 0.10  # Lower cap on low-trust sources
+
+use_case: "Market volatility, geopolitical events, earnings stress"

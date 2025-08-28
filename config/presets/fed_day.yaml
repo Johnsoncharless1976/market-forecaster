@@ -1,0 +1,30 @@
+preset_name: "Fed Day"
+description: "Federal Reserve meeting/announcement day"
+status: "CANDIDATE_ONLY"
+
+council_parameters:
+  blend_lambda: 0.70  # Standard blend
+  beta_binomial_alpha_0: 2
+  beta_binomial_beta_0: 2
+  miss_penalty_pct: 15.0  # High miss penalty (binary outcomes)
+  vol_guard_widen_pct: 25.0  # Very wide bands (Fed volatility)
+
+impact_thresholds:
+  news_threshold: 0.35  # Higher news threshold (focus on Fed)
+  macro_threshold: 1.2   # Higher macro threshold (Fed dominates)
+  band_adjustment_pct: 8.0   # Large band adjustments  
+  confidence_adjustment_pct: 2.0  # Lower confidence (uncertainty)
+
+magnet_engine:
+  enabled: false  # Disable magnet (Fed moves break levels)
+  gamma: 0.0
+  beta: 0.0
+
+source_weights:
+  wsj: 1.0       # Maximum weight on tier-1 Fed coverage
+  reuters: 0.95
+  benzinga: 0.15  # Minimize commentary (focus on facts)
+  schwab: 0.30   # Some weight on institutional view
+  zerohedge_cap: 0.05  # Minimal low-trust sources
+
+use_case: "FOMC meetings, Fed speeches, rate decisions, Jackson Hole"

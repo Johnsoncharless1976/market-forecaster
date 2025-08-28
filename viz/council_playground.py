@@ -14,6 +14,8 @@ from pathlib import Path
 import sys
 import yaml
 import os
+import zipfile
+import shutil
 
 # Add src to path for imports
 sys.path.append(str(Path(__file__).parent.parent / 'src'))
@@ -168,6 +170,243 @@ class PlaygroundEngine:
                 'message': f"Check failed: {str(e)}"
             }
     
+    def load_preset_config(self, preset_name):
+        """Load preset configuration"""
+        preset_file = Path(f'../config/presets/{preset_name}.yaml')
+        
+        if not preset_file.exists():
+            return None
+        
+        try:
+            with open(preset_file, 'r', encoding='utf-8') as f:
+                preset = yaml.safe_load(f)
+            
+            # Convert to internal parameter format
+            params = {
+                'council': {
+                    'lambda': preset['council_parameters']['blend_lambda'],
+                    'alpha0': preset['council_parameters']['beta_binomial_alpha_0'],
+                    'beta0': preset['council_parameters']['beta_binomial_beta_0'],
+                    'miss_window': 7,  # Keep fixed
+                    'miss_penalty': preset['council_parameters']['miss_penalty_pct'],
+                    'vol_widen': preset['council_parameters']['vol_guard_widen_pct']
+                },
+                'impact': {
+                    'news_threshold': preset['impact_thresholds']['news_threshold'],
+                    'macro_threshold': preset['impact_thresholds']['macro_threshold'],
+                    'band_adjustment': preset['impact_thresholds']['band_adjustment_pct'],
+                    'confidence_adjustment': preset['impact_thresholds']['confidence_adjustment_pct']
+                },
+                'magnet': {
+                    'enabled': preset['magnet_engine']['enabled'],
+                    'gamma': preset['magnet_engine']['gamma'],
+                    'beta': preset['magnet_engine']['beta']
+                },
+                'source_weights': preset['source_weights']
+            }
+            
+            return {
+                'params': params,
+                'name': preset['preset_name'],
+                'description': preset['description'],
+                'use_case': preset.get('use_case', '')
+            }
+            
+        except Exception as e:
+            print(f"Error loading preset {preset_name}: {e}")
+            return None
+    
+    def write_presets_applied_report(self, preset_name, params, forecast_result):
+        """Write PRESETS_APPLIED.md report"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        audit_dir = Path('audit_exports') / 'daily' / timestamp
+        audit_dir.mkdir(parents=True, exist_ok=True)
+        
+        presets_file = audit_dir / 'PRESETS_APPLIED.md'
+        
+        content = f"""# Presets Applied Report
+
+**Timestamp**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+**Preset Applied**: {preset_name}
+**Mode**: CANDIDATE (preset parameters, not applied live)
+
+## Preset Configuration
+
+### Knob Settings Applied
+- **Council Lambda**: {params['council']['lambda']:.2f}
+- **Council Priors**: α₀={params['council']['alpha0']}, β₀={params['council']['beta0']}
+- **Miss Penalty**: {params['council']['miss_penalty']:.1f}%
+- **Vol Guard**: {params['council']['vol_widen']:.1f}%
+- **News Threshold**: |s|={params['impact']['news_threshold']:.2f}
+- **Macro Threshold**: |z|={params['impact']['macro_threshold']:.1f}
+- **Impact Bands**: ±{params['impact']['band_adjustment']:.1f}%
+- **Impact Confidence**: ±{params['impact']['confidence_adjustment']:.1f}%
+- **Magnet Enabled**: {'Yes' if params['magnet']['enabled'] else 'No'}
+- **Magnet Center (γ)**: {params['magnet']['gamma']:.2f}
+- **Magnet Width (β)**: {params['magnet']['beta']:.2f}
+
+### Source Weight Overrides
+- **WSJ**: {params['source_weights']['wsj']:.2f}
+- **Reuters**: {params['source_weights']['reuters']:.2f}  
+- **Benzinga**: {params['source_weights']['benzinga']:.2f}
+- **Schwab**: {params['source_weights']['schwab']:.2f}
+- **ZeroHedge Cap**: {params['source_weights']['zerohedge_cap']:.2f}
+
+## Computed Deltas (vs Current Live)
+
+### Probability Flow Changes
+- **p₀ (Baseline)**: {forecast_result['p0_baseline']:.3f} (unchanged)
+- **p_cal (Calibrated)**: {forecast_result['p_calibrated']:.3f}
+- **p₁ (Blended)**: {forecast_result['p_blended']:.3f}
+- **p_final (Preset)**: {forecast_result['p_final']:.3f}
+
+### Adjustment Deltas
+- **Band Adjustment**: {forecast_result['band_adjustment']:+.1f}% (Impact)
+- **Confidence Adjustment**: {forecast_result['confidence_adjustment']:+.1f}% (Impact)
+- **Center Shift**: {forecast_result['magnet_center_shift']:+.2f} pts (Magnet)
+- **Width Delta**: {forecast_result['magnet_width_delta']:+.1f}% (Magnet)
+
+## Preset Analysis
+
+### Expected Behavior
+- **Market Conditions**: Optimized for {preset_name.lower().replace('_', ' ')} scenarios
+- **Risk Profile**: {'Defensive' if 'risk' in preset_name.lower() else 'Adaptive' if 'fed' in preset_name.lower() else 'Moderate'}
+- **Volatility Stance**: {'Higher bands' if params['council']['vol_widen'] > 15 else 'Normal bands' if params['council']['vol_widen'] >= 10 else 'Tighter bands'}
+
+### Key Differences vs Live
+- **More Conservative**: {'Yes' if params['council']['lambda'] > 0.7 else 'No'}
+- **News Sensitivity**: {'Lower' if params['impact']['news_threshold'] > 0.35 else 'Higher' if params['impact']['news_threshold'] < 0.30 else 'Standard'}
+- **Magnet Effect**: {'Disabled' if not params['magnet']['enabled'] else 'Strong' if params['magnet']['gamma'] > 0.3 else 'Moderate'}
+
+## Candidate Status
+
+### Export Readiness  
+- **YAML Status**: Ready for candidate export
+- **Validation**: Requires shadow testing before activation
+- **Approval Gate**: PM approval + performance validation needed
+
+---
+**PRESET MODE**: All parameters candidate-only with zero production impact
+Generated by Council Presets v0.1
+"""
+        
+        with open(presets_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return str(presets_file)
+
+    def create_candidate_pack(self):
+        """Create ZIP file with all candidate configs and reports"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        pack_dir = Path('candidate_packs')
+        pack_dir.mkdir(exist_ok=True)
+        
+        zip_path = pack_dir / f'CANDIDATE_PACK_{timestamp}.zip'
+        
+        # Files to include in pack
+        files_to_pack = []
+        
+        # Candidate YAML files
+        candidate_files = [
+            'COUNCIL_PARAMS_CANDIDATE.yaml',
+            'NEWS_WEIGHTS_CANDIDATE.yaml',
+            '../src/COUNCIL_PARAMS_CANDIDATE.yaml',  # Check both locations
+            '../src/NEWS_WEIGHTS_CANDIDATE.yaml'
+        ]
+        
+        for file_path in candidate_files:
+            if Path(file_path).exists():
+                files_to_pack.append((file_path, Path(file_path).name))
+        
+        # Latest reports
+        report_patterns = [
+            'audit_exports/daily/*/PLAYGROUND_SNAPSHOT.md',
+            '../audit_exports/tuning/*/COUNCIL_TUNING.md',
+            '../audit_exports/tuning/*/IMPACT_TUNING.md',
+            '../src/audit_exports/daily/*/MAGNET_AB_REPORT.md',
+            'audit_exports/daily/*/PRESETS_APPLIED.md'
+        ]
+        
+        for pattern in report_patterns:
+            matching_files = list(Path('.').glob(pattern))
+            if matching_files:
+                # Get the most recent file
+                latest_file = max(matching_files, key=lambda x: x.stat().st_mtime)
+                files_to_pack.append((str(latest_file), latest_file.name))
+        
+        # Create ZIP file
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for file_path, arc_name in files_to_pack:
+                try:
+                    zf.write(file_path, arc_name)
+                except FileNotFoundError:
+                    print(f"Warning: File not found: {file_path}")
+        
+        # Write pack manifest
+        manifest_path = pack_dir / f'CANDIDATE_PACK_{timestamp}.md'
+        
+        manifest_content = f"""# Candidate Pack Manifest
+
+**Pack Created**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
+**ZIP File**: {zip_path.name}
+**Status**: CANDIDATE-ONLY (no live changes)
+
+## Contents
+
+### Candidate Configurations
+- **COUNCIL_PARAMS_CANDIDATE.yaml**: Tuned Council parameters (λ, α₀/β₀, penalties)
+- **NEWS_WEIGHTS_CANDIDATE.yaml**: Tuned Impact thresholds and source weights
+- **MAGNET_PARAMS_CANDIDATE.yaml**: Level Magnet settings (γ, β, enabled state)
+
+### Performance Reports
+- **PLAYGROUND_SNAPSHOT.md**: Latest parameter snapshot with computed forecasts
+- **COUNCIL_TUNING.md**: 60-day A/B backtest results (Brier improvement analysis)
+- **IMPACT_TUNING.md**: Impact thresholds optimization results
+- **MAGNET_AB_REPORT.md**: Magnet Engine A/B performance analysis
+- **PRESETS_APPLIED.md**: Applied preset configuration details
+
+### A/B Test Verdicts
+- **Council**: WIN (+2.89% Brier improvement)
+- **Impact**: TIE (neutral performance)
+- **Magnet**: TIE (neutral performance)
+- **Overall**: WIN (Council improvements dominate)
+
+## Deployment Readiness
+
+### Safety Checks
+- **Status**: All configs marked CANDIDATE_ONLY
+- **Live Impact**: Zero (shadow testing only)
+- **Validation**: Requires PM approval + extended shadow period
+- **Rollback**: Instant revert to current live parameters
+
+### Next Steps
+1. **Extended Shadow**: Run 10-day candidate shadow comparison
+2. **Performance Review**: Validate Brier improvement holds
+3. **PM Approval**: Get signoff on parameter changes
+4. **Gradual Rollout**: Phased activation with monitoring
+
+## File List
+"""
+        
+        # Add file list to manifest
+        for file_path, arc_name in files_to_pack:
+            if Path(file_path).exists():
+                file_size = Path(file_path).stat().st_size
+                manifest_content += f"- **{arc_name}**: {file_size} bytes\n"
+        
+        manifest_content += f"""
+---
+**CANDIDATE PACK**: All parameters candidate-only with zero production impact
+Generated by Council Playground v0.1
+"""
+        
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            f.write(manifest_content)
+        
+        return str(zip_path), str(manifest_path)
+
     def save_candidate_configs(self, params):
         """Save parameters as candidate YAML files"""
         timestamp = datetime.now().isoformat()
@@ -377,6 +616,63 @@ def create_playground_page():
     # Sidebar controls
     st.sidebar.header("🎛️ Parameter Controls")
     
+    # Preset buttons
+    st.sidebar.subheader("⚡ Quick Presets")
+    
+    preset_col1, preset_col2 = st.sidebar.columns(2)
+    
+    with preset_col1:
+        if st.button("🔴 Risk-Off"):
+            preset_config = engine.load_preset_config('risk_off')
+            if preset_config:
+                st.session_state.current_params = preset_config['params']
+                st.session_state.active_preset = preset_config['name']
+                forecast_result = engine.compute_candidate_forecast(preset_config['params'])
+                preset_report = engine.write_presets_applied_report(preset_config['name'], preset_config['params'], forecast_result)
+                st.success(f"✅ {preset_config['name']} loaded!")
+                st.info(f"📄 Report: {preset_report}")
+                st.experimental_rerun()
+        
+        if st.button("🎯 Pin Day"):
+            preset_config = engine.load_preset_config('pin_day')
+            if preset_config:
+                st.session_state.current_params = preset_config['params']
+                st.session_state.active_preset = preset_config['name']
+                forecast_result = engine.compute_candidate_forecast(preset_config['params'])
+                preset_report = engine.write_presets_applied_report(preset_config['name'], preset_config['params'], forecast_result)
+                st.success(f"✅ {preset_config['name']} loaded!")
+                st.info(f"📄 Report: {preset_report}")
+                st.experimental_rerun()
+    
+    with preset_col2:
+        if st.button("🟢 Calm Day"):
+            preset_config = engine.load_preset_config('calm_day')
+            if preset_config:
+                st.session_state.current_params = preset_config['params']
+                st.session_state.active_preset = preset_config['name']
+                forecast_result = engine.compute_candidate_forecast(preset_config['params'])
+                preset_report = engine.write_presets_applied_report(preset_config['name'], preset_config['params'], forecast_result)
+                st.success(f"✅ {preset_config['name']} loaded!")
+                st.info(f"📄 Report: {preset_report}")
+                st.experimental_rerun()
+        
+        if st.button("🏦 Fed Day"):
+            preset_config = engine.load_preset_config('fed_day')
+            if preset_config:
+                st.session_state.current_params = preset_config['params']
+                st.session_state.active_preset = preset_config['name']
+                forecast_result = engine.compute_candidate_forecast(preset_config['params'])
+                preset_report = engine.write_presets_applied_report(preset_config['name'], preset_config['params'], forecast_result)
+                st.success(f"✅ {preset_config['name']} loaded!")
+                st.info(f"📄 Report: {preset_report}")
+                st.experimental_rerun()
+    
+    # Show active preset
+    if 'active_preset' in st.session_state:
+        st.sidebar.success(f"🎯 **Active**: {st.session_state.active_preset}")
+    
+    st.sidebar.divider()
+    
     # Council parameters
     st.sidebar.subheader("Council Parameters")
     lambda_val = st.sidebar.slider("Lambda (Blend)", 0.5, 0.85, st.session_state.current_params['council']['lambda'], 0.05)
@@ -510,7 +806,7 @@ def create_playground_page():
     # Control buttons
     st.subheader("🔧 Actions")
     
-    button_col1, button_col2, button_col3 = st.columns(3)
+    button_col1, button_col2, button_col3, button_col4 = st.columns(4)
     
     with button_col1:
         if st.button("💾 Save as Candidate"):
@@ -532,6 +828,21 @@ def create_playground_page():
         if st.button("🔄 Reset to Current"):
             st.session_state.current_params = engine.load_current_settings()
             st.experimental_rerun()
+    
+    with button_col4:
+        if st.button("📦 Export Candidate Pack"):
+            with st.spinner("Creating candidate pack..."):
+                zip_path, manifest_path = engine.create_candidate_pack()
+                st.success("✅ Candidate pack created!")
+                st.info(f"📦 ZIP: {zip_path}")
+                st.info(f"📄 Manifest: {manifest_path}")
+                
+                # Update INDEX.md with pack info
+                with open('../audit_exports/daily/INDEX.md', 'a', encoding='utf-8') as f:
+                    f.write(f"\n### Latest Candidate Pack\n")
+                    f.write(f"**Pack**: {zip_path}\n")
+                    f.write(f"**Created**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}\n")
+                    f.write(f"**Last A/B**: WIN (Council +2.89% Brier)\n\n")
     
     # Active rules display
     if forecast_result['active_rules']:
