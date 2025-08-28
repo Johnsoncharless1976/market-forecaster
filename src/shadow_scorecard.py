@@ -71,9 +71,13 @@ class ShadowScorecard:
             return {'day': 1, 'total': 30, 'start_date': '2025-08-28', 'status': 'ACTIVE'}
         
     def generate_synthetic_shadow_data(self):
-        """Generate synthetic 30-day shadow performance data"""
+        """Generate synthetic shadow performance data for cohort window only"""
         # In production, this would load from actual decision logs
         np.random.seed(42)  # Reproducible results
+        
+        # Get cohort progress to limit data to cohort window only
+        cohort = self.get_cohort_day()
+        cohort_days = cohort['day']
         
         dates = []
         baseline_briers = []
@@ -81,9 +85,9 @@ class ShadowScorecard:
         miss_tags = []
         outcomes = []
         
-        # Generate 30 days of synthetic performance
-        for i in range(self.scorecard_days):
-            date = datetime.now().date() - timedelta(days=self.scorecard_days - i - 1)
+        # Generate data for cohort days only (not full 30 days)
+        for i in range(cohort_days):
+            date = datetime.now().date() - timedelta(days=cohort_days - i - 1)
             
             # Skip weekends (simplified)
             if date.weekday() >= 5:
@@ -124,23 +128,34 @@ class ShadowScorecard:
         })
     
     def calculate_scorecard_metrics(self, df):
-        """Calculate 30-day rolling metrics"""
+        """Calculate cohort window metrics"""
         
-        # Brier improvement
+        # Get cohort progress
+        cohort = self.get_cohort_day()
+        cohort_days = cohort['day']
+        
+        # Brier improvement (cohort window only)
         avg_baseline_brier = df['baseline_brier'].mean()
         avg_candidate_brier = df['candidate_brier'].mean()
         brier_improvement_pct = (avg_baseline_brier - avg_candidate_brier) / avg_baseline_brier * 100
         
-        # ECE calculation (simplified)
-        recent_days = min(self.ece_lookback_days, len(df))
-        recent_df = df.tail(recent_days)
+        # ECE calculation - only if cohort has ≥10 days
+        if cohort_days >= 10:
+            recent_days = min(self.ece_lookback_days, len(df))
+            recent_df = df.tail(recent_days)
+            
+            # Mock ECE calculation (would use proper binning in production)
+            baseline_ece = 0.045  # Sample baseline ECE
+            candidate_ece = 0.043  # Sample candidate ECE
+            ece_improvement_pct = (baseline_ece - candidate_ece) / baseline_ece * 100
+            ece_display = f"{ece_improvement_pct:+.2f}%"
+        else:
+            baseline_ece = None
+            candidate_ece = None
+            ece_improvement_pct = None
+            ece_display = "n/a"
         
-        # Mock ECE calculation (would use proper binning in production)
-        baseline_ece = 0.045  # Sample baseline ECE
-        candidate_ece = 0.043  # Sample candidate ECE
-        ece_improvement_pct = (baseline_ece - candidate_ece) / baseline_ece * 100
-        
-        # Straddle gap (distance from 0.5)
+        # Straddle gap (cohort window only)
         baseline_straddle = np.mean(np.abs(0.5 - 0.5))  # Simplified
         candidate_straddle = np.mean(np.abs(df['candidate_brier'].values - 0.5))
         straddle_improvement_pct = (baseline_straddle - candidate_straddle) / baseline_straddle * 100 if baseline_straddle > 0 else 0
@@ -161,8 +176,10 @@ class ShadowScorecard:
         return {
             'total_days': len(df),
             'trading_days': len(df),  # Same for synthetic data
+            'cohort_days': cohort_days,
             'brier_improvement_pct': brier_improvement_pct,
             'ece_improvement_pct': ece_improvement_pct,
+            'ece_display': ece_display,
             'straddle_improvement_pct': straddle_improvement_pct,
             'shadow_streak': current_streak,
             'avg_baseline_brier': avg_baseline_brier,
@@ -190,15 +207,15 @@ class ShadowScorecard:
 
 **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}
 **Cohort Day**: {cohort['day']}/{cohort['total']} (start={cohort['start_date']})
-**Period**: Real-time cohort tracking ({metrics['trading_days']} trading days elapsed)
+**Period**: Cohort-only tracking ({metrics['cohort_days']} trading days in cohort)
 **Mode**: SHADOW (candidate vs baseline comparison, zero live impact)
 
 ## Executive Summary
 
 ### Performance Metrics
-- **ΔBrier(30d)**: {metrics['brier_improvement_pct']:+.2f}% (candidate vs baseline)
-- **ΔECE(20d)**: {metrics['ece_improvement_pct']:+.2f}% (calibration improvement)
-- **ΔStraddle**: {metrics['straddle_improvement_pct']:+.2f}% (confidence gap)
+- **ΔBrier(cohort)**: {metrics['brier_improvement_pct']:+.2f}% (candidate vs baseline)
+- **ΔECE(cohort∩20d)**: {metrics['ece_display']} (calibration improvement)
+- **ΔStraddle(cohort)**: {metrics['straddle_improvement_pct']:+.2f}% (confidence gap)
 - **Shadow Streak**: {metrics['shadow_streak']} consecutive days better/equal
 
 ### Scorecard Progress
@@ -214,11 +231,11 @@ class ShadowScorecard:
 - **Improvement**: {metrics['brier_improvement_pct']:+.2f}% better
 - **Daily Consistency**: {sum(1 for x in metrics['daily_improvements'] if x >= 0)} out of {len(metrics['daily_improvements'])} days improved
 
-### Expected Calibration Error (20-day)
-- **Baseline ECE**: {metrics['baseline_ece']:.4f}
+### Expected Calibration Error (cohort∩20d)
+{f'''- **Baseline ECE**: {metrics['baseline_ece']:.4f}
 - **Candidate ECE**: {metrics['candidate_ece']:.4f}
 - **Improvement**: {metrics['ece_improvement_pct']:+.2f}% better calibration
-- **Status**: {'Well calibrated' if metrics['candidate_ece'] < 0.05 else 'Needs improvement'}
+- **Status**: {'Well calibrated' if metrics['candidate_ece'] < 0.05 else 'Needs improvement'}''' if metrics['ece_improvement_pct'] is not None else '- **Status**: Pending (needs ≥10 cohort days for ECE calculation)'}
 
 ### Miss-Tag Analysis
 - **Total Misses**: {metrics['miss_tag_total']} out of {metrics['trading_days']} days
@@ -249,7 +266,7 @@ class ShadowScorecard:
 
 ### Deployment Readiness Indicators
 - **30-Day Performance**: {'✅ STRONG' if metrics['brier_improvement_pct'] > 2 else '🟡 MODERATE' if metrics['brier_improvement_pct'] > 0 else '❌ WEAK'}
-- **Calibration**: {'✅ IMPROVED' if metrics['ece_improvement_pct'] > 0 else '❌ DEGRADED'}
+- **Calibration**: {'✅ IMPROVED' if metrics['ece_improvement_pct'] is not None and metrics['ece_improvement_pct'] > 0 else '🟡 PENDING' if metrics['ece_improvement_pct'] is None else '❌ DEGRADED'}
 - **Consistency**: {'✅ STABLE' if metrics['shadow_streak'] >= 5 else '❌ VARIABLE'}
 
 ## Next Steps
@@ -376,12 +393,12 @@ def main():
     # Calculate metrics
     metrics = scorecard.calculate_scorecard_metrics(shadow_df)
     
-    print(f"Shadow Scorecard (30-day rolling):")
+    print(f"Shadow Scorecard (cohort tracking):")
     print(f"Delta Brier: {metrics['brier_improvement_pct']:+.2f}%")
-    print(f"Delta ECE: {metrics['ece_improvement_pct']:+.2f}%")
+    print(f"Delta ECE: {metrics['ece_display']}")
     print(f"Delta Straddle: {metrics['straddle_improvement_pct']:+.2f}%")
     print(f"Shadow Streak: {metrics['shadow_streak']} days")
-    print(f"Trading Days: {metrics['trading_days']}/30")
+    print(f"Cohort Days: {metrics['cohort_days']}/30")
     
     # Write scorecard report
     scorecard_file = scorecard.write_shadow_scorecard(metrics)
