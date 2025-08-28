@@ -488,7 +488,17 @@ def main():
     with link_col4:
         st.markdown("📋 [Evidence](./audit_exports/daily/)")
     
-    st.title("🧠 Zen Council v0.1")
+    # Header with pipeline source
+    header_col1, header_col2 = st.columns([3, 1])
+    with header_col1:
+        st.title("🧠 Zen Council v0.1")
+    with header_col2:
+        try:
+            pipeline_sha = os.getenv('CI_COMMIT_SHORT_SHA', 'local')
+            pipeline_time = datetime.now().strftime('%H:%M:%S UTC')
+            st.caption(f"**Source**: pipeline {pipeline_sha} @ {pipeline_time}")
+        except:
+            st.caption("**Source**: local development")
     
     # Load data first to check shadow mode
     try:
