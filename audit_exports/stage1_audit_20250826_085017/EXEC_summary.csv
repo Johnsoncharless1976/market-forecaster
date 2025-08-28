@@ -1,5 +1,0 @@
-check,violations,status
-duplicates,0,PASS
-weekend_rows,0,PASS
-nulls_ohlc,0,PASS
-weekday_gaps,0,PASS

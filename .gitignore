@@ -30,3 +30,17 @@ viz_bundle.zip
 **/NEWS_SCORE.md
 **/LEVEL_MAGNETS.md
 **/WIN_GATE*.md
+# Evidence/artifacts anywhere
+**/audit_exports/**
+**/artifacts/**
+**/candidate_packs/**
+**/screenshots/**/*.png
+**/PILOT_DECISION_LOG.csv
+**/EMAIL_ENHANCE_PROOF.md
+**/NEWS_FEED_LOG.md
+**/MACRO_EVENTS.md
+**/NEWS_SCORE.md
+**/LEVEL_MAGNETS.md
+**/WIN_GATE*.md
+**/SHADOW_SCORECARD*.md
+**/PIN_MONITOR.md

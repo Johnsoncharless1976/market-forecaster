@@ -1,2 +1,0 @@
-﻿{'event': 'context', 'database': 'ZEN_MARKET', 'schema': 'FORECASTING'}
-{'event': 'applied', 'file': 'C:\\Users\\johns\\market-forecaster\\audit_exports\\stage1_audit_20250826_085017\\04_nulls.sql'}

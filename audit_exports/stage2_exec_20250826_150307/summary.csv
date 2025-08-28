@@ -1,6 +1,0 @@
-check,violations,status
-"Duplicates (SYMBOL, TRADE_DATE)",0,PASS
-Weekend rows,0,PASS
-Nulls in CLOSE/ADJ/RSI/ATR,0,PASS
-Out-of-bounds RSI/ATR,0,PASS
-Missing features vs MARKET_OHLCV (post-warmup),0,PASS

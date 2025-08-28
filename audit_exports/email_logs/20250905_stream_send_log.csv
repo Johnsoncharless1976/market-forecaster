@@ -1,9 +1,0 @@
-RUN_ID,RECIPIENT,SUBJECT,BADGES,STATUS,REASON,STREAM_TYPE,SEND_TIME,MACRO_GATE,POSTMORTEM_READY,SENT_AT
-AM_20250905_090000_20250905,tra***@zenmarket.ai,"🌅 Morning Kneeboard – 2025-09-05 (sent 9:00 ET)","AM_KNEEBOARD,MACRO_GATE=false,SEND_TIME=09:00",SENT,delivered successfully,AM,09:00,FALSE,,2025-09-05 09:00:15
-AM_20250905_090000_20250905,ana***@zenmarket.ai,"🌅 Morning Kneeboard – 2025-09-05 (sent 9:00 ET)","AM_KNEEBOARD,MACRO_GATE=false,SEND_TIME=09:00",SENT,delivered successfully,AM,09:00,FALSE,,2025-09-05 09:00:16
-AM_20250905_090000_20250905,ext***@otherfirm.com,"🌅 Morning Kneeboard – 2025-09-05 (sent 9:00 ET)","AM_KNEEBOARD,MACRO_GATE=false,SEND_TIME=09:00",SKIP,no_general_consent,AM,09:00,FALSE,,2025-09-05 09:00:17
-PM_20250905_170000_20250905,tra***@zenmarket.ai,"🌆 Evening Kneeboard – 2025-09-05 (sent 5:00 PM ET)","PM_KNEEBOARD,POSTMORTEM_READY=true,SEND_TIME=17:00",SENT,delivered successfully,PM,17:00,,TRUE,2025-09-05 17:00:32
-PM_20250905_170000_20250905,ana***@zenmarket.ai,"🌆 Evening Kneeboard – 2025-09-05 (sent 5:00 PM ET)","PM_KNEEBOARD,POSTMORTEM_READY=true,SEND_TIME=17:00",SENT,delivered successfully,PM,17:00,,TRUE,2025-09-05 17:00:33
-PM_20250905_170000_20250905,ext***@otherfirm.com,"🌆 Evening Kneeboard – 2025-09-05 (sent 5:00 PM ET)","PM_KNEEBOARD,POSTMORTEM_READY=true,SEND_TIME=17:00",SKIP,no_general_consent,PM,17:00,,TRUE,2025-09-05 17:00:34
-AM_20250906_091500_20250906,tra***@zenmarket.ai,"🌅 Morning Kneeboard – 2025-09-06 (sent 9:15 ET)","AM_KNEEBOARD,MACRO_GATE=true,SEND_TIME=09:15",SENT,delivered successfully,AM,09:15,TRUE,,2025-09-06 09:15:22
-AM_20250906_091500_20250906,ana***@zenmarket.ai,"🌅 Morning Kneeboard – 2025-09-06 (sent 9:15 ET)","AM_KNEEBOARD,MACRO_GATE=true,SEND_TIME=09:15",SENT,delivered successfully,AM,09:15,TRUE,,2025-09-06 09:15:23
