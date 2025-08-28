@@ -113,8 +113,9 @@ class EmailKneeboard:
                 <a href="http://localhost:8501">Live Dashboard</a> •
                 <a href="http://localhost:8502">Playground</a> •
                 <a href="http://localhost:8502">Replay</a> •
+                <a href="#batch">{"AM Batch" if email_type == "AM" else "EOD Batch"}</a> •
+                <a href="#sparkline">Confidence Strip</a> •
                 <a href="#cohort">Cohort Day {glance_data.get('cohort_day', '0/30')}</a> •
-                <a href="#confidence">Confidence {glance_data.get('confidence_pct', 0):.0f}%</a> •
                 <a href="#wingate">WinGate</a> •
                 <a href="#impact">Impact</a> •
                 <a href="#magnet">Magnet</a>
@@ -139,6 +140,8 @@ class EmailKneeboard:
                 <p><strong>Pipeline:</strong> {glance_data.get('pipeline_sha', 'local')} @ {glance_data.get('evidence_timestamp', 'N/A')}</p>
                 <p><strong>Live Gate:</strong> {glance_data.get('live_gate_status', 'PENDING')} (PM approval required)</p>
                 <p><strong>Mode:</strong> SHADOW (all systems evaluation-only)</p>
+                <p><strong>Stability:</strong> {"Twin daily batches (AM + EOD)" if os.getenv('STABILITY_MODE', 'false').lower() == 'true' else "Real-time artifacts"}</p>
+                <p><strong>Batch Type:</strong> {email_type} {"Market Open" if email_type == "AM" else "End of Day"}</p>
             </div>
         </div>
         
