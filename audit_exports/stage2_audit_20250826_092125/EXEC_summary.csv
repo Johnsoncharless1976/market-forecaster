@@ -1,5 +1,0 @@
-check,violations,status
-nulls_in_features,0,PASS
-rsi_bounds,0,PASS
-atr_negative,0,PASS
-coverage_post_warmup,0,PASS

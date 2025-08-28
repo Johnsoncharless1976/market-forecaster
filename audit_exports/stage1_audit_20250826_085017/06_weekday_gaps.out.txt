@@ -1,2 +1,0 @@
-﻿{'event': 'context', 'database': 'ZEN_MARKET', 'schema': 'FORECASTING'}
-{'error': "000904 (42000): SQL compilation error: error line 15 at position 31\ninvalid identifier 'H.H_DATE'"}
