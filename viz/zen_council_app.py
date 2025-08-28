@@ -26,6 +26,7 @@ try:
     from impact_guardrails import ImpactGuardrails
     from level_magnet_engine import LevelMagnetEngine
     from magnet_ab_backtest import MagnetABBacktest
+    from win_conditions_gate import WinConditionsGate
 except ImportError:
     st.error("Could not import Zen Council modules. Check src/ directory.")
     st.stop()
@@ -191,6 +192,31 @@ def load_magnet_ab_results():
         }
 
 
+def load_win_conditions():
+    """Load Win Conditions Gate assessment"""
+    try:
+        gate = WinConditionsGate()
+        assessment = gate.assess_win_conditions()
+        
+        # Write WIN_GATE.md report
+        gate_report = gate.write_win_gate_report(assessment)
+        assessment['report_file'] = gate_report
+        
+        return assessment
+    except Exception as e:
+        return {
+            'ready': False,
+            'conditions': {
+                'brier_gate': {'value': 0.0, 'pass': False},
+                'ece_gate': {'value': 0.0, 'pass': False}, 
+                'straddle_gate': {'value': 0.0, 'pass': False},
+                'streak_gate': {'value': 0, 'pass': False}
+            },
+            'summary': {'gates_passed': 0, 'total_gates': 4, 'pass_rate': 0.0},
+            'error': str(e)
+        }
+
+
 def load_impact_ab_results():
     """Load latest Impact A/B backtest results"""
     try:
@@ -317,11 +343,12 @@ def main():
         st.markdown("*Making the Brain Real - Live Forecast Intelligence*")
         st.success("✅ **LIVE MODE**: Council adjustments are active and applied to forecasts")
     
-    # Load gates, impact, magnet, and A/B data (zen_data already loaded above)
+    # Load gates, impact, magnet, win conditions, and A/B data (zen_data already loaded above)
     try:
         gates_data = load_latest_gates_data()
         impact_data = load_latest_impact_data()
         magnet_data = load_magnet_data()
+        win_conditions = load_win_conditions()
         ab_results = load_impact_ab_results()
         magnet_ab_results = load_magnet_ab_results()
     except Exception as e:
@@ -392,6 +419,39 @@ def main():
     
     with col2:
         st.plotly_chart(create_calibration_gauge(zen_data), use_container_width=True)
+    
+    # Win Conditions Tile
+    st.subheader("🏆 Win Conditions Gate")
+    
+    win_col1, win_col2, win_col3, win_col4, win_col5 = st.columns(5)
+    
+    with win_col1:
+        brier_value = win_conditions['conditions']['brier_gate']['value']
+        brier_status = "✅" if win_conditions['conditions']['brier_gate']['pass'] else "❌"
+        st.metric("ΔBrier(60d)", f"{brier_value:+.2f}%", delta=f"{brier_status} Improvement")
+    
+    with win_col2:
+        ece_value = win_conditions['conditions']['ece_gate']['value'] 
+        ece_status = "✅" if win_conditions['conditions']['ece_gate']['pass'] else "❌"
+        st.metric("ΔECE(20d)", f"{ece_value:+.2f}%", delta=f"{ece_status} Calibration")
+    
+    with win_col3:
+        straddle_value = win_conditions['conditions']['straddle_gate']['value']
+        straddle_status = "✅" if win_conditions['conditions']['straddle_gate']['pass'] else "❌" 
+        st.metric("ΔStraddle", f"{straddle_value:+.2f}%", delta=f"{straddle_status} Confidence")
+    
+    with win_col4:
+        streak_value = win_conditions['conditions']['streak_gate']['value']
+        streak_status = "✅" if win_conditions['conditions']['streak_gate']['pass'] else "❌"
+        st.metric("Shadow Streak", f"{streak_value}d", delta=f"{streak_status} Consistency")
+    
+    with win_col5:
+        if win_conditions['ready']:
+            st.success("🎯 **READY**")
+            st.caption(f"{win_conditions['summary']['gates_passed']}/4 gates pass")
+        else:
+            st.error("⏸️ **NOT READY**")  
+            st.caption(f"{win_conditions['summary']['gates_passed']}/4 gates pass")
     
     # Magnet Engine Chip
     if magnet_data['enabled'] and not magnet_data.get('muted', False):

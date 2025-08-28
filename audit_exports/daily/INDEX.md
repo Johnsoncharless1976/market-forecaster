@@ -7,6 +7,8 @@
 
 **Links**: [Live Dashboard](http://localhost:8501) · [Playground](http://localhost:8502) · [Replay](http://localhost:8502) · [Evidence](./audit_exports/daily/)
 
+**WinGate**: Ready | ΔBrier=+2.89% | ΔECE=-4.44% | ΔStraddle=-2.34% | Streak=10d
+
 ## Recent Activity
 
 ### 2025-08-28
