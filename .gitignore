@@ -44,3 +44,22 @@ viz_bundle.zip
 **/WIN_GATE*.md
 **/SHADOW_SCORECARD*.md
 **/PIN_MONITOR.md
+
+# Generated configuration and evidence
+CI_SIGNATURE_STAGE7_DEFER.md
+COUNCIL_PARAMS_CANDIDATE.yaml
+CUTOVER_READINESS.md
+NEWS_SOURCE_WEIGHTS.yaml
+NEWS_WEIGHTS_CANDIDATE.yaml
+NEWS_WHITELIST.md
+PROVIDER_CONFIG.md
+ROLLBACK_PLAN.md
+deploy_viz.py
+stage7/
+
+# Editor noise
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
