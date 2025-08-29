@@ -19,7 +19,7 @@ before_script:
   - pip install --upgrade pip
   - pip install -r vscode_snowflake_starter/requirements.txt
 
-stage1_exec:
+exec_stage:
   stage: exec
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -36,7 +36,7 @@ stage1_exec:
       - audit_exports/stage1_exec_*/REPORT_EXEC.md
       - audit_exports/stage1_exec_*/summary.csv
 
-stage1_audit:
+audit_stage:
   stage: audit
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
