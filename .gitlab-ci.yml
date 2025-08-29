@@ -34,7 +34,7 @@ before_script:
   - pip install --upgrade pip
   - pip install -r vscode_snowflake_starter/requirements.txt
 
-stage1:exec:
+exec_stage1:
   stage: exec
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -51,10 +51,8 @@ stage1:exec:
       - audit_exports/stage1_exec_*/REPORT_EXEC.md
       - audit_exports/stage1_exec_*/summary.csv
 
-stage1:audit:
+audit_stage1:
   stage: audit
-  dependencies:
-    - stage1:exec
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
