@@ -6,7 +6,6 @@ variables:
   PYTHONUNBUFFERED: "1"
 
 stages:
-  - exec
   - audit
 
 cache:
@@ -19,8 +18,8 @@ before_script:
   - pip install --upgrade pip
   - pip install -r vscode_snowflake_starter/requirements.txt
 
-exec_stage:
-  stage: exec
+stage1_combined:
+  stage: audit
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -29,20 +28,13 @@ exec_stage:
     - mkdir -p audit_exports
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "=== STAGE1:EXEC JOB COMPLETE ==="
+    - echo "=== STAGE1:AUDIT JOB STARTING ==="
+    - ls -la audit_exports/
+    - python vscode_snowflake_starter/src/ci_guard_stage1.py
+    - echo "=== STAGE1:AUDIT JOB COMPLETE ==="
   artifacts:
     when: always
     expire_in: 14 days
     paths:
       - audit_exports/stage1_exec_*/REPORT_EXEC.md
       - audit_exports/stage1_exec_*/summary.csv
-
-audit_stage:
-  stage: audit
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  script:
-    - echo "=== STAGE1:AUDIT JOB STARTING ==="
-    - ls -la audit_exports/
-    - python vscode_snowflake_starter/src/ci_guard_stage1.py
-    - echo "=== STAGE1:AUDIT JOB COMPLETE ==="
