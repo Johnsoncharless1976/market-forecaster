@@ -38,8 +38,6 @@ stage1_exec:
 
 stage1_audit:
   stage: audit
-  dependencies:
-    - stage1_exec
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
