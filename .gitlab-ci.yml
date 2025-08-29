@@ -53,9 +53,8 @@ stage1:exec:
 
 stage1:audit:
   stage: audit
-  needs:
-    - job: stage1:exec
-      artifacts: true
+  dependencies:
+    - stage1:exec
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
