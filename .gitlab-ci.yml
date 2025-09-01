@@ -1,8 +1,25 @@
+# File: .gitlab-ci.yml
+# Title: Stage 1 Exec + Stage 1 Audit (fixed artifacts + dotenv)
+# Commit Notes:
+# - Artifacts now point to vscode_snowflake_starter/audit_exports/**
+# - exec.env is published both as dotenv *and* as a normal artifact
+# - audit job reads EXEC_READY from dotenv; file is optional
+# - Both jobs use python:3.11 to avoid ruby image mismatch
+
 stages: [exec, audit]
+
+default:
+  image: python:3.11
+  cache:
+    key: "python:3.11-non_protected"
+    paths:
+      - .cache/pip
+  variables:
+    PIP_CACHE_DIR: ".cache/pip"
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
 exec_stage:
   stage: exec
-  image: python:3.11
   script:
     - python --version
     - pip install -r vscode_snowflake_starter/requirements.txt
@@ -16,6 +33,7 @@ exec_stage:
     paths:
       - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
       - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
+      - exec.env
     reports:
       dotenv: exec.env
 
@@ -25,7 +43,16 @@ audit_stage:
     - job: exec_stage
       artifacts: true
   script:
-    - test -f exec.env || (echo "Missing exec.env from exec_stage" && exit 1)
-    - source exec.env
-    # run your validator here, example:
+    - python --version
+    - pip install -r vscode_snowflake_starter/requirements.txt
+    # Gate on dotenv var passed from exec_stage
+    - '[ "${EXEC_READY}" = "true" ] || (echo "EXEC_READY not set from exec_stage" && exit 1)'
+    # Optional: verify file also arrived (since we publish it as a normal artifact)
+    - 'test -f exec.env && echo "exec.env found (optional check)" || echo "exec.env not present (okay, dotenv covers it)"'
     - python vscode_snowflake_starter/src/audit_validate.py
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - "vscode_snowflake_starter/audit_exports/stage1_audit_*/REPORT_AUDIT.md"
+      - "vscode_snowflake_starter/audit_exports/stage1_audit_*/summary.csv"
