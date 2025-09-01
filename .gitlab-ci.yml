@@ -2,22 +2,23 @@
 # Purpose: Run Stage-1 audit in CI, install deps incl. Snowflake, align artifact paths,
 # and pass EXEC_READY to downstream via dotenv.
 
-default:
-  image: python:3.11
-  variables:
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-  cache:
-    key: "${CI_JOB_IMAGE}"
-    paths:
-      - .cache/pip
-  before_script:
-    - python --version
-    - pip install --upgrade pip
-    # Ensure all deps, and guarantee snowflake connector is present
-    - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
-    - echo "PYTHONPATH=$PYTHONPATH"
+image: python:3.11
+
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+
+cache:
+  key: "${CI_JOB_IMAGE}"
+  paths:
+    - .cache/pip
+
+before_script:
+  - python --version
+  - pip install --upgrade pip
+  - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
+  - echo "PYTHONPATH=$PYTHONPATH"
 
 stages:
   - exec
