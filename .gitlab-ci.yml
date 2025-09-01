@@ -1,54 +1,19 @@
-image: python:3.11
-
-variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONUNBUFFERED: "1"
-
-stages: 
-  - exec
-  - audit
-
-cache:
-  key: "$CI_JOB_IMAGE"
-  paths:
-    - .cache/pip
-
-before_script:
-  - python --version
-  - pip install --upgrade pip
-  - pip install -r vscode_snowflake_starter/requirements.txt
-
-exec_stage:
-  stage: exec
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+audit_cli:
+  stage: reports
   script:
-    - echo "=== EXEC STAGE STARTING ==="
-    - mkdir -p audit_exports
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "EXEC_READY=true" > exec.env
-    - echo "=== EXEC STAGE COMPLETE ==="
   artifacts:
     when: always
-    expire_in: 14 days
     paths:
-      - audit_exports/stage1_exec_*/REPORT_EXEC.md
-      - audit_exports/stage1_exec_*/summary.csv
-    reports:
-      dotenv: exec.env
-
-audit_stage:
-  stage: audit  
-  needs:
-    - job: exec_stage
-      artifacts: true
+      - vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md
+      - vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv
+    expire_in: 7 days
+  dependencies: []
   rules:
-    - if: '$EXEC_READY == "true"'
-      when: on_success
-    - when: never
-  script:
-    - echo "=== AUDIT STAGE STARTING ==="
-    - ls -la audit_exports/
-    - python vscode_snowflake_starter/src/ci_guard_stage1.py
-    - echo "=== AUDIT STAGE COMPLETE ==="
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  when: manual
+  after_script:
+    - echo "===== SUMMARY ====="
+    - ls -la vscode_snowflake_starter/audit_exports/stage1_exec_* || true
+    - sed -n '1,200p' vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md || true
