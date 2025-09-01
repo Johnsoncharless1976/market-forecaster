@@ -30,8 +30,8 @@ audit_cli:
   artifacts:
     when: always
     paths:
-      - vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md
-      - vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv
+      - "**/*.md"
+      - "**/*.csv" 
       - exec.env
     reports:
       dotenv: exec.env
