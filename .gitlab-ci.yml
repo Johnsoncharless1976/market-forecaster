@@ -1,38 +1,61 @@
-image: python:3.11
+# .gitlab-ci.yml — ZenMarket Forecaster CI/CD (perf/chopguard-v0.2.1)
 
-variables:
-  PIP_CACHE_DIR: ".cache/pip"
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+default:
+  image: python:3.11
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+  cache:
+    key: "$CI_JOB_IMAGE"
+    paths:
+      - .cache/pip
+  before_script:
+    - python --version
+    - pip install --upgrade pip
+    - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
+    - echo "PYTHONPATH=$PYTHONPATH"
 
-cache:
-  key: "python-3.11"
-  paths:
-    - .cache/pip
+stages: [exec, reports]
 
-before_script:
-  - python --version
-  - pip install --upgrade pip
-  - pip install -r vscode_snowflake_starter/requirements.txt
-
-stages:
-  - exec
-
-exec_stage:
+audit_cli:
   stage: exec
   script:
-    - echo "=== EXEC STAGE STARTING ==="
+    - echo "=== EXEC STAGE START ==="
+    - python -c "import snowflake; print('snowflake import OK')"
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "EXEC_READY=true" > exec.env
-    - echo "=== FILES CREATED ==="
-    - find . -name "*.md" -o -name "*.csv" | head -10
+    - echo "=== EXEC STAGE DONE ==="
   artifacts:
     when: always
-    expire_in: 7 days
     paths:
-      - "**/*.md"
-      - "**/*.csv"
-      - exec.env
+      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
+      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
     reports:
       dotenv: exec.env
+    expire_in: 1 week
   rules:
-    - when: manual
+    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+publish_exec_report:
+  stage: reports
+  needs: ["audit_cli"]
+  script:
+    - echo "EXEC_READY=${EXEC_READY}"
+    - test "${EXEC_READY}" = "true"
+    - echo "Exported files:" && ls -R vscode_snowflake_starter/audit_exports || true
+    - echo "===== REPORT_EXEC.md (head) ====="
+    - head -50 $(ls -1 vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md | tail -1)
+    - echo "===== summary.csv (tail) ====="
+    - tail -20 $(ls -1 vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv | tail -1)
+  dependencies:
+    - audit_cli
+  artifacts:
+    when: always
+    paths:
+      - "vscode_snowflake_starter/audit_exports/"
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
