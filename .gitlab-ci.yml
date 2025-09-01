@@ -1,11 +1,12 @@
 # .gitlab-ci.yml — ZenMarket Forecaster CI/CD (perf/chopguard-v0.2.1)
 
+variables:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+
 default:
   image: python:3.11
-  variables:
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
   cache:
     key: "$CI_JOB_IMAGE"
     paths:
