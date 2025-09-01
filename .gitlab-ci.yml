@@ -1,19 +1,25 @@
+stages:
+  - reports
+
 audit_cli:
   stage: reports
   script:
+    - echo "=== EXEC STAGE STARTING ==="
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "EXEC_READY=true" > exec.env
+    - echo "=== EXEC STAGE COMPLETE ==="
   artifacts:
     when: always
+    expose_as: "Stage 1 Exec Audit"
     paths:
       - vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md
       - vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv
     expire_in: 7 days
-  dependencies: []
+  after_script:
+    - echo "===== ARTIFACTS FOUND ====="
+    - ls -la vscode_snowflake_starter/audit_exports/stage1_exec_* || true
+    - echo "===== REPORT PREVIEW ====="
+    - sed -n '1,80p' vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md || true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "web"'
   when: manual
-  after_script:
-    - echo "===== SUMMARY ====="
-    - ls -la vscode_snowflake_starter/audit_exports/stage1_exec_* || true
-    - sed -n '1,200p' vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md || true
