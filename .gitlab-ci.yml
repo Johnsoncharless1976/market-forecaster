@@ -25,7 +25,10 @@ audit_cli:
     - echo "=== EXEC STAGE START ==="
     - python -c "import snowflake; print('snowflake import OK')"
     - python vscode_snowflake_starter/src/exec_audit_summary.py
-    - echo "EXEC_READY=true" > exec.env
+    # capture newest audit dir from THIS run and pass via dotenv
+    - AUDIT_DIR="$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)"
+    - echo "AUDIT_DIR=$AUDIT_DIR" > exec.env
+    - echo "EXEC_READY=true" >> exec.env
     - echo "=== EXEC STAGE DONE ==="
   artifacts:
     when: always
@@ -45,17 +48,18 @@ publish_exec_report:
   script:
     - echo "EXEC_READY=${EXEC_READY}"
     - test "${EXEC_READY}" = "true"
-    - echo "Exported files:" && ls -R vscode_snowflake_starter/audit_exports || true
+    - echo "AUDIT_DIR=${AUDIT_DIR}"
+    - test -d "${AUDIT_DIR}"
     - echo "===== REPORT_EXEC.md (head) ====="
-    - head -50 $(ls -1 vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md | tail -1)
+    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md"
     - echo "===== summary.csv (tail) ====="
-    - tail -20 $(ls -1 vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv | tail -1)
+    - tail -20 "${AUDIT_DIR}/summary.csv"
   dependencies:
     - audit_cli
   artifacts:
     when: always
     paths:
-      - "vscode_snowflake_starter/audit_exports/"
+      - "${AUDIT_DIR:-vscode_snowflake_starter/audit_exports}/"
     expire_in: 1 week
   rules:
     - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
