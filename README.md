@@ -1,4 +1,28 @@
-# market-forecaster
+# market-forecaster [DEPRECATED]
+
+**🚨 DEPRECATED — moved to ZenMarket AI: https://gitlab.com/zenmarketai/market-forecaster 🚨**
+
+This repository has been consolidated into the canonical ZenMarket AI project. All future development, issues, and contributions should be directed to the canonical repository.
+
+**Migration Date**: 2025-08-27  
+**Canonical Repository**: https://gitlab.com/zenmarketai/market-forecaster
+
+# Daily Index
+
+## Stages Status
+- Stage 1: GREEN (ingest + exec audit complete)
+- Stage 2: GREEN (features + exec audit complete) 
+- Stage 3: GREEN (correlations complete)
+- Stage 4: GREEN (forecast engine complete)
+- Stage 5: GREEN (email delivery complete)
+- Stage 6: GREEN (viz + deploy complete)
+- Stage 7: DEFERRED (Provider: Yahoo only; external=disabled; cost gate active)
+
+## Live Dashboard
+**Zen Council**: [http://localhost:8501](http://localhost:8501) (Forecast Intelligence Brain)
+
+## Recent Activity  
+- **2025-08-28**: Stage 7 re-scoped to Yahoo-only, external provider deferred
 
 
 

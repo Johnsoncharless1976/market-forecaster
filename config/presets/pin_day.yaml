@@ -1,0 +1,31 @@
+preset_name: "Pin Day"  
+description: "OPEX/expiration day with strong level attraction"
+status: "CANDIDATE_ONLY"
+
+council_parameters:
+  blend_lambda: 0.65  # Moderate blend
+  beta_binomial_alpha_0: 2
+  beta_binomial_beta_0: 2
+  miss_penalty_pct: 8.0   # Lower miss penalty (pins expected)
+  vol_guard_widen_pct: 12.0  # Slightly wider for pin uncertainty
+
+impact_thresholds:
+  news_threshold: 0.32  # Slightly higher threshold (less news impact on pin days)
+  macro_threshold: 1.1   # Higher threshold (pins dominate macro)
+  band_adjustment_pct: 4.0   # Modest impact adjustments
+  confidence_adjustment_pct: 4.0
+
+magnet_engine:
+  enabled: true  # Key feature for pin days
+  gamma: 0.35    # Medium-high center nudge
+  beta: 0.08     # Medium width tightening
+  opex_multiplier: 1.8  # Higher OPEX effect
+
+source_weights:
+  wsj: 0.85      # Standard weights
+  reuters: 0.80
+  benzinga: 0.45  # Higher market commentary (pin chatter)
+  schwab: 0.40
+  zerohedge_cap: 0.25  # Higher cap (pin speculation)
+
+use_case: "OPEX days, monthly/weekly expiration, major level tests"

@@ -1,0 +1,1 @@
+-- Title: Stage 1  Least-priv grants (042_wh)\nGRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE ZEN_PIPELINE_ROLE;

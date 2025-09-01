@@ -1,0 +1,21 @@
+council_parameters:
+  calibration:
+    beta_binomial_alpha_0: 2
+    beta_binomial_beta_0: 2
+    blend_lambda: 0.6
+  deployment:
+    activation_required: PM approval + shadow validation
+    live_config: src/zen_council.py (unchanged)
+    source: Playground tuning
+    status: CANDIDATE_ONLY
+  description: Playground-generated parameters - NOT LIVE
+  miss_tag_adjustment:
+    boost_pct: 10.0
+    penalty_pct: 10.0
+    window_days: 7
+  status: CANDIDATE_ONLY
+  timestamp: '2025-08-28T09:32:04.920161'
+  version: v0.1.1-playground
+  volatility_guard:
+    band_widen_pct: 15.0
+    confidence_reduce_pct: 15.0

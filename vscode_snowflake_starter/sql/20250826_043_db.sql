@@ -1,0 +1,1 @@
+-- Title: Stage 1  Least-priv grants (043_db)\nGRANT USAGE ON DATABASE ZEN_MARKET TO ROLE ZEN_PIPELINE_ROLE;

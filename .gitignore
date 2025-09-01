@@ -11,3 +11,56 @@ data/*.parquet
 
 # OS/Jupyter
 .DS_Store
+
+# Audit & Generated Artifacts
+audit_exports/daily/**
+audit_exports/weekly/**
+audit_exports/cohorts/**/SHADOW_SCORECARD*.md
+artifacts/**
+candidate_packs/**
+viz_bundle.zip
+**/*.zip
+
+# Screenshots & Evidence
+**/screenshots/*.png
+**/PILOT_DECISION_LOG.csv
+**/EMAIL_ENHANCE_PROOF.md
+**/NEWS_FEED_LOG.md
+**/MACRO_EVENTS.md
+**/NEWS_SCORE.md
+**/LEVEL_MAGNETS.md
+**/WIN_GATE*.md
+# Evidence/artifacts anywhere
+**/audit_exports/**
+**/artifacts/**
+**/candidate_packs/**
+**/screenshots/**/*.png
+**/PILOT_DECISION_LOG.csv
+**/EMAIL_ENHANCE_PROOF.md
+**/NEWS_FEED_LOG.md
+**/MACRO_EVENTS.md
+**/NEWS_SCORE.md
+**/LEVEL_MAGNETS.md
+**/WIN_GATE*.md
+**/SHADOW_SCORECARD*.md
+**/PIN_MONITOR.md
+
+# Generated configuration and evidence
+CI_SIGNATURE_STAGE7_DEFER.md
+COUNCIL_PARAMS_CANDIDATE.yaml
+CUTOVER_READINESS.md
+NEWS_SOURCE_WEIGHTS.yaml
+NEWS_WEIGHTS_CANDIDATE.yaml
+NEWS_WHITELIST.md
+PROVIDER_CONFIG.md
+ROLLBACK_PLAN.md
+deploy_viz.py
+stage7/
+
+# Editor noise
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/settings.local.json
