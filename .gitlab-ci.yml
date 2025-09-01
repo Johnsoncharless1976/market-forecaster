@@ -29,11 +29,14 @@ audit_cli:
     - python -c "import os; print('PYTHONPATH=', os.environ.get('PYTHONPATH')); import snowflake; print('snowflake import OK')"
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "EXEC_READY=true" > exec.env
+    - echo "=== DEBUG: Files created ==="
+    - find . -name "*.md" -o -name "*.csv" | head -10
   artifacts:
     when: always
     paths:
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
+      - vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md
+      - vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv
+      - exec.env
     reports:
       dotenv: exec.env
     expire_in: 1 week
