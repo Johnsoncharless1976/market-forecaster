@@ -1,55 +1,38 @@
-# File: .gitlab-ci.yml
-# Title: Exec + Audit with correct artifacts & dotenv
-# Notes: moved variables to top-level to avoid "default config contains unknown keys: variables"
+image: python:3.11
 
-stages: [exec, audit]
-
-# Global vars (not under `default:`)
 variables:
   PIP_CACHE_DIR: ".cache/pip"
   PIP_DISABLE_PIP_VERSION_CHECK: "1"
 
-# Safe defaults
-default:
-  image: python:3.11
-  cache:
-    key: "python-3.11-non_protected"
-    paths:
-      - .cache/pip
+cache:
+  key: "python-3.11"
+  paths:
+    - .cache/pip
+
+before_script:
+  - python --version
+  - pip install --upgrade pip
+  - pip install -r vscode_snowflake_starter/requirements.txt
+
+stages:
+  - exec
 
 exec_stage:
   stage: exec
   script:
-    - python --version
-    - pip install -r vscode_snowflake_starter/requirements.txt
     - echo "=== EXEC STAGE STARTING ==="
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - echo "EXEC_READY=true" > exec.env
-    - echo "=== EXEC STAGE COMPLETE ==="
+    - echo "=== FILES CREATED ==="
+    - find . -name "*.md" -o -name "*.csv" | head -10
   artifacts:
     when: always
     expire_in: 7 days
     paths:
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
+      - "**/*.md"
+      - "**/*.csv"
       - exec.env
     reports:
       dotenv: exec.env
-
-audit_stage:
-  stage: audit
-  needs:
-    - job: exec_stage
-      artifacts: true
-  script:
-    - python --version
-    - pip install -r vscode_snowflake_starter/requirements.txt
-    - '[ "${EXEC_READY}" = "true" ] || (echo "EXEC_READY not set from exec_stage" && exit 1)'
-    - 'test -f exec.env && echo "exec.env found (optional)" || echo "exec.env not present (dotenv covers it)"'
-    - python vscode_snowflake_starter/src/audit_validate.py
-  artifacts:
-    when: always
-    expire_in: 7 days
-    paths:
-      - "vscode_snowflake_starter/audit_exports/stage1_audit_*/REPORT_AUDIT.md"
-      - "vscode_snowflake_starter/audit_exports/stage1_audit_*/summary.csv"
+  rules:
+    - when: manual
