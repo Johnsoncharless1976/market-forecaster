@@ -60,17 +60,18 @@ audit_cli:
 publish_exec_report:
   stage: reports
   needs: ["audit_cli"]
+  when: always               # <- print even if audit failed
   variables:
     PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
   script:
     - echo "EXEC_READY=${EXEC_READY}"
-    - test "${EXEC_READY}" = "true"
+    - test "${EXEC_READY}" = "true" || { echo "exec not ready"; exit 0; }
     - echo "AUDIT_DIR=${AUDIT_DIR}"
-    - test -d "${AUDIT_DIR}"
+    - test -d "${AUDIT_DIR}" || { echo "no audit dir"; exit 0; }
     - echo "===== REPORT_EXEC.md (head) ====="
-    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md"
+    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md" || true
     - echo "===== summary.csv (tail) ====="
-    - tail -20 "${AUDIT_DIR}/summary.csv"
+    - tail -20 "${AUDIT_DIR}/summary.csv" || true
   artifacts:
     when: always
     paths:
@@ -89,8 +90,7 @@ publish_exec_report:
 
 slack_mr_update:
   stage: reports
-  # Skip Python setup here to keep it lightweight
-  before_script: []
+  before_script: []           # keep lightweight: no Python installs
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
@@ -114,14 +114,9 @@ slack_mr_update:
 
 slack_incident_on_fail:
   stage: reports
-  # Ensure this runs even if audit_cli failed
-  needs: ["audit_cli"]
-  when: always
-  # Skip Python setup here to keep it lightweight
-  before_script: []
-  rules:
-    - if: '$CI_PIPELINE_STATUS == "failed"'
-      when: always
+  needs: ["audit_cli"]        # ensure it runs after audit, even if audit failed
+  when: on_failure            # <- guaranteed to run after a failure
+  before_script: []           # keep lightweight
   script:
     - |
       AUD="vscode_snowflake_starter/audit_exports"
