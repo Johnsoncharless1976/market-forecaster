@@ -1,171 +1,241 @@
 #!/usr/bin/env python3
 """
-Claude Runner - A resilient Claude API client with model fallback
-Sends prompts from prompt.md to Anthropic's Claude API with automatic model fallback.
+Claude Runner - resilient Anthropic client with model fallback
+- Default model: claude-3-haiku-20240307 (cheapest)
+- max_tokens is clamped to each model's true limit
+- Prompt sources: CLI arg -> ANTHROPIC_PROMPT -> ANTHROPIC_PROMPT_FILE
+                  -> prompt.md next to script -> prompt.md in CWD
 """
 
 import os
 import sys
-import dotenv
-import requests
+import json
 from pathlib import Path
+import requests
+import dotenv
 
+# ---------- Model limits (output token caps) ----------
+MODEL_LIMITS = {
+    "claude-3-haiku-20240307": 4096,
+    "claude-3-sonnet-20240229": 4096,
+    "claude-3-5-sonnet-20241022": 8192,   # if you have access
+    "claude-3-opus-20240229": 4096,
+}
 
+# ---------- Environment ----------
 def load_environment():
-    """Load environment variables with error handling."""
+    dotenv.load_dotenv()
+
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("ERROR: ANTHROPIC_API_KEY not found in environment or .env")
+        sys.exit(1)
+
+    # Default to cheaper model unless you override
+    model = os.getenv("ANTHROPIC_MODEL", "claude-3-haiku-20240307").strip()
+
+    # Requested max tokens; will be clamped to the model’s limit
     try:
-        dotenv.load_dotenv()
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            print("ERROR: ANTHROPIC_API_KEY not found in .env file")
-            print("   Please add: ANTHROPIC_API_KEY=your_key_here")
-            sys.exit(1)
-        
-        # Get model from environment or use default
-        model = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
-        print("SUCCESS: Environment loaded successfully")
-        print(f"SUCCESS: Using model: {model}")
-        
-        return api_key, model
-    except Exception as e:
-        print(f"ERROR: Loading environment: {e}")
-        sys.exit(1)
+        requested_max = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1024"))
+    except ValueError:
+        requested_max = 1024
 
-
-def load_prompt():
-    """Load prompt from prompt.md with error handling."""
-    prompt_file = Path("prompt.md")
-    
-    if not prompt_file.exists():
-        print("ERROR: prompt.md file not found in current directory")
-        print("   Please create prompt.md with your Claude prompt")
-        sys.exit(1)
-    
     try:
-        with open(prompt_file, "r", encoding="utf-8") as file:
-            content = file.read().strip()
-        
-        if not content:
-            print("ERROR: prompt.md is empty")
-            print("   Please add your prompt to prompt.md")
-            sys.exit(1)
-        
-        print("SUCCESS: Prompt loaded successfully")
-        return content
-    except Exception as e:
-        print(f"ERROR: Reading prompt.md: {e}")
-        sys.exit(1)
+        temperature = float(os.getenv("ANTHROPIC_TEMPERATURE", "0.5"))
+    except ValueError:
+        temperature = 0.5
 
+    print(f"ENV OK  : Using model: {model}")
+    print(f"ENV OK  : Requested max_tokens: {requested_max}")
+    print(f"ENV OK  : Temperature: {temperature}")
+    return api_key, model, requested_max, temperature
 
-def try_model(api_key, model, user_prompt):
-    """Try to call Claude API with a specific model."""
-    url = "https://api.anthropic.com/v1/messages"
+# ---------- Prompt resolution ----------
+def resolve_prompt_from_sources(argv) -> str:
+    """
+    Priority:
+      1) CLI arg: python claude_runner.py "your prompt"
+      2) ANTHROPIC_PROMPT (env)
+      3) ANTHROPIC_PROMPT_FILE (env; abs or relative path)
+      4) prompt.md next to this script
+      5) prompt.md in current working directory
+    """
+    # 1) CLI arg
+    if len(argv) > 1 and argv[1].strip():
+        print("PROMPT  : Using CLI argument")
+        return argv[1].strip()
+
+    # 2) env text
+    env_prompt = os.getenv("ANTHROPIC_PROMPT")
+    if env_prompt and env_prompt.strip():
+        print("PROMPT  : Using ANTHROPIC_PROMPT (env)")
+        return env_prompt.strip()
+
+    # 3) env file path
+    env_prompt_file = os.getenv("ANTHROPIC_PROMPT_FILE")
+    if env_prompt_file:
+        p = Path(env_prompt_file).expanduser()
+        if not p.is_absolute():
+            p = Path.cwd() / p
+        if p.exists():
+            print(f"PROMPT  : Using ANTHROPIC_PROMPT_FILE: {p}")
+            content = p.read_text(encoding="utf-8").strip()
+            if content:
+                return content
+            print("ERROR   : Prompt file is empty:", p)
+
+    # 4) prompt.md next to script
+    script_dir = Path(__file__).resolve().parent
+    near_script = script_dir / "prompt.md"
+    if near_script.exists():
+        print(f"PROMPT  : Using prompt.md next to script: {near_script}")
+        content = near_script.read_text(encoding="utf-8").strip()
+        if content:
+            return content
+        print("ERROR   : prompt.md next to script is empty.")
+
+    # 5) prompt.md in CWD
+    cwd_file = Path.cwd() / "prompt.md"
+    if cwd_file.exists():
+        print(f"PROMPT  : Using prompt.md in CWD: {cwd_file}")
+        content = cwd_file.read_text(encoding="utf-8").strip()
+        if content:
+            return content
+        print("ERROR   : prompt.md in CWD is empty.")
+
+    print("ERROR   : No prompt found.")
+    print('         Provide one of:')
+    print('           • CLI: python claude_runner.py "your prompt"')
+    print("           • Env text: ANTHROPIC_PROMPT")
+    print("           • Env path: ANTHROPIC_PROMPT_FILE=/path/to/prompt.md")
+    print("           • File: prompt.md (next to script or in CWD)")
+    sys.exit(1)
+
+# ---------- Anthropic call ----------
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+
+def clamp_max_tokens(model: str, requested: int) -> int:
+    limit = MODEL_LIMITS.get(model)
+    if limit is None:
+        # Unknown model; be conservative
+        print(f"WARNING : Unknown model limit for {model}. Clamping to 4096.")
+        limit = 4096
+    if requested > limit:
+        print(f"INFO    : Clamping max_tokens {requested} -> {limit} for {model}")
+        return limit
+    return requested
+
+def post_message(api_key: str, model: str, prompt: str, max_tokens: int, temperature: float):
     headers = {
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",
         "content-type": "application/json",
     }
-    json_data = {
+    body = {
         "model": model,
-        "max_tokens": 4000,
-        "temperature": 0.5,
-        "messages": [
-            {"role": "user", "content": user_prompt}
-        ],
+        "max_tokens": clamp_max_tokens(model, max_tokens),
+        "temperature": temperature,
+        "messages": [{"role": "user", "content": prompt}],
     }
-    
+    resp = requests.post(ANTHROPIC_URL, headers=headers, json=body, timeout=90)
+    return resp
+
+def try_model(api_key: str, model: str, prompt: str, max_tokens: int, temperature: float):
+    print(f"TRY     : {model}")
     try:
-        print(f"TRYING: Model {model}")
-        response = requests.post(url, headers=headers, json=json_data, timeout=60)
-        
-        if response.status_code == 200:
-            result = response.json()
-            print(f"SUCCESS: Model {model} worked!")
-            return result
-        elif response.status_code == 404:
-            print(f"ERROR: Model {model} not available (404)")
-            return None
-        elif response.status_code == 401:
-            print("ERROR: Authentication failed (401)")
-            print("   Check your ANTHROPIC_API_KEY in .env file")
-            return "auth_error"
-        else:
-            print(f"ERROR: API Error {response.status_code}: {response.text}")
-            return None
-            
+        r = post_message(api_key, model, prompt, max_tokens, temperature)
     except requests.exceptions.Timeout:
-        print(f"ERROR: Timeout with model: {model}")
+        print("ERROR   : Timeout")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"ERROR: Request failed with model {model}: {e}")
+        print(f"ERROR   : Request error: {e}")
         return None
 
+    if r.status_code == 200:
+        print(f"SUCCESS : {model}")
+        return r.json()
 
-def call_claude_with_fallback(api_key, preferred_model, user_prompt):
-    """Call Claude API with automatic model fallback."""
-    
-    # Define fallback chain
-    models = [
+    # Common errors
+    if r.status_code == 401:
+        print("ERROR   : 401 Unauthorized — check ANTHROPIC_API_KEY")
+        return "auth_error"
+    if r.status_code == 404:
+        print(f"ERROR   : 404 Model not found: {model}")
+        return None
+
+    # Token limit or quota style messages
+    try:
+        err = r.json()
+    except Exception:
+        err = {"text": r.text}
+    print(f"ERROR   : {r.status_code} {err}")
+    return None
+
+# ---------- Fallback orchestrator ----------
+def call_with_fallback(api_key: str, preferred_model: str, prompt: str, max_tokens: int, temperature: float):
+    chain = [
         preferred_model,
-        "claude-3-sonnet-20240229", 
-        "claude-3-haiku-20240307"
+        "claude-3-haiku-20240307",    # cheapest default
+        "claude-3-sonnet-20240229",   # reliable alt
     ]
-    
-    # Remove duplicates while preserving order
-    models = list(dict.fromkeys(models))
-    
-    print("STARTING: Claude API call with model fallback")
-    
-    for i, model in enumerate(models):
-        result = try_model(api_key, model, user_prompt)
-        
-        if result == "auth_error":
+    # de-dup while preserving order
+    seen, models = set(), []
+    for m in chain:
+        if m not in seen:
+            seen.add(m); models.append(m)
+
+    print("START   : Calling Anthropic with fallback")
+    for idx, model in enumerate(models):
+        res = try_model(api_key, model, prompt, max_tokens, temperature)
+        if res == "auth_error":
             sys.exit(1)
-        elif result is not None:
-            return result
-        elif i < len(models) - 1:
-            print("WARNING: Falling back to next model...")
-    
-    print("ERROR: All models failed. Please check:")
-    print("   1. Your API key is valid")
-    print("   2. You have access to Claude models")
-    print("   3. Your internet connection")
+        if res is not None:
+            return res
+        if idx < len(models) - 1:
+            print("INFO    : Falling back to next model...")
+    print("ERROR   : All models failed.")
     sys.exit(1)
 
-
+# ---------- Output ----------
 def format_output(result):
-    """Format and display the Claude response."""
     try:
-        response_text = result['content'][0]['text']
-        
-        print("\n" + "="*60)
+        # Anthropic Messages API: {"content":[{"type":"text","text":"..."}], ...}
+        blocks = result.get("content", [])
+        first_text = ""
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "text":
+                first_text = b.get("text", "")
+                if first_text:
+                    break
+        if not first_text and isinstance(blocks, list) and blocks:
+            # fallback (some SDKs may structure differently)
+            first_text = blocks[0].get("text", "")
+
+        print("\n" + "=" * 60)
         print("CLAUDE RESPONSE")
-        print("="*60)
-        print(response_text)
-        print("="*60 + "\n")
-        
-    except KeyError as e:
-        print(f"ERROR: Unexpected response format: {e}")
-        print("Raw response:", result)
+        print("=" * 60)
+        print(first_text.strip())
+        print("=" * 60 + "\n")
 
+        # Optional: save to file if ANTHROPIC_OUT is set
+        out_path = os.getenv("ANTHROPIC_OUT")
+        if out_path:
+            Path(out_path).expanduser().write_text(first_text, encoding="utf-8")
+            print(f"SAVED   : {out_path}")
 
+    except Exception as e:
+        print(f"ERROR   : Formatting output: {e}")
+        print("RAW     :", json.dumps(result, indent=2))
+
+# ---------- Main ----------
 def main():
-    """Main execution function."""
-    print("Claude Runner v2.0 - Resilient API Client")
+    print("Claude Runner v2.3")
     print("-" * 50)
-    
-    # Load environment and prompt
-    api_key, model = load_environment()
-    user_prompt = load_prompt()
-    
-    # Call Claude with fallback
-    result = call_claude_with_fallback(api_key, model, user_prompt)
-    
-    # Format and display output
+    api_key, model, requested_max, temperature = load_environment()
+    prompt = resolve_prompt_from_sources(sys.argv)
+    result = call_with_fallback(api_key, model, prompt, requested_max, temperature)
     format_output(result)
-    
-    print("SUCCESS: Claude Runner completed successfully")
-
+    print("DONE    : Claude Runner completed")
 
 if __name__ == "__main__":
     main()
