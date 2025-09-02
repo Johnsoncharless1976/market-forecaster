@@ -1,0 +1,35 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five Clearest Facts:
+- No duplicate rows were found in the data.
+- There were no missing prices or null values.
+- The OHLC (Open, High, Low, Close) data passed sanity checks.
+- There were no gaps in the true weekday data.
+- There were no weekend rows in the data.
+
+STATUS: Green
+The data ingestion process appears to be functioning correctly, with no significant issues identified.
+
+Remediation Plan: N/A
+
+Metrics:
+- All metrics are zero, indicating no gaps, duplicates, or rejections.
+- The holiday_weekdays count is also zero, which is acceptable since the true_weekday_gaps are zero.
+
+Executive Headline:
+The Stage-1 (Data Ingestion) EXEC audit results show a well-functioning data ingestion process with no significant issues.
+
+
+
+STATUS: Green
+
+TASK:
+Stage-1 Exec Audit: NYSE Holiday Gate (verify)
+Verify enhanced audit with NYSE holiday calendar producing holiday_weekdays and true_weekday_gaps; assert true_weekday_gaps=0; emit summary.csv + detail CSVs.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

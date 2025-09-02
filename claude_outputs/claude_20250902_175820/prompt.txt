@@ -1,0 +1,33 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five key facts:
+- No duplicates, null prices, or OHLC sanity issues detected.
+- Zero holiday weekdays and zero true weekday gaps.
+- Weekday gaps and weekend rows are also zero.
+
+2) STATUS: Green
+The Stage-1 (Data Ingestion) EXEC audit results indicate a successful data ingestion process with no critical issues identified.
+
+3) Remediation Plan: N/A
+
+4) Metrics:
+- All counts are zero, indicating no gaps, duplicates, or rejections.
+- The true_weekday_gaps count of 0 is consistent with the holiday_weekdays count of 0, suggesting complete trading day data.
+
+5) Executive Headline:
+The Stage-1 (Data Ingestion) EXEC audit results show a robust and reliable data ingestion process with no significant issues.
+
+
+
+STATUS: n/a
+
+TASK:
+Stage-3 Forecast Writer v1 (Baseline)
+Write Python to read FEATURES_DAILY from Snowflake and write baseline forecast (persistence) into FORECAST_DAILY via idempotent MERGE; add audit logging.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

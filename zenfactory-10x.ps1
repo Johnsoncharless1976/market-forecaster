@@ -160,7 +160,7 @@ No placeholders. Include how to run and where to save files in repo.
 Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.
 "@
             Info "Launching Claude for Step $step - $title"
-            & .\claude.ps1 -Prompt $promptText -Model $model
+            & .\claude-launch.ps1 -Prompt $promptText -Model $model
         } else {
             Info "AUTO_NEXT disabled or no task - pausing after suggestion."
         }

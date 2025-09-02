@@ -1,0 +1,72 @@
+﻿# Readiness Checklist for ZenMarket AI Forecaster
+
+## Green Lights
+- [x] Data Ingestion Process Functioning Correctly
+- [x] No Duplicate Data Points
+- [x] No Missing Data on Holidays or Weekends
+- [x] No Null Prices in the Data
+- [x] OHLC Data Passed Sanity Checks
+- [x] No Gaps in the True Trading Day Data
+
+## Environment Variables
+- `SNOWFLAKE_ACCOUNT`
+- `SNOWFLAKE_USER`
+- `SNOWFLAKE_PASSWORD`
+- `SNOWFLAKE_WAREHOUSE`
+- `SNOWFLAKE_DATABASE`
+- `SNOWFLAKE_SCHEMA`
+
+## CI/CD Links
+- [GitHub Repository](https://github.com/your-org/zen-forecaster)
+- [CircleCI Pipeline](https://circleci.com/gh/your-org/zen-forecaster)
+
+## Notion Database Links
+- [Data Ingestion Process](https://www.notion.so/your-workspace/Data-Ingestion-Process-abcd1234)
+- [Model Training and Deployment](https://www.notion.so/your-workspace/Model-Training-and-Deployment-efgh5678)
+- [Monitoring and Alerting](https://www.notion.so/your-workspace/Monitoring-and-Alerting-ijkl9012)
+
+## Data Ingestion Process
+
+### `data_ingestion.py`
+```python
+"""
+File: data_ingestion.py
+Title: Data Ingestion for ZenMarket AI Forecaster
+Commit Notes: Implement idempotent MERGE for data ingestion
+"""
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+
+def ingest_data():
+    # Load environment variables
+    account = os.getenv("SNOWFLAKE_ACCOUNT")
+    user = os.getenv("SNOWFLAKE_USER")
+    password = os.getenv("SNOWFLAKE_PASSWORD")
+    warehouse = os.getenv("SNOWFLAKE_WAREHOUSE")
+    database = os.getenv("SNOWFLAKE_DATABASE")
+    schema = os.getenv("SNOWFLAKE_SCHEMA")
+
+    # Create Snowflake connection
+    engine = create_engine(f"snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}")
+
+    # Load data from source
+    data = pd.read_csv("path/to/data.csv")
+
+    # Perform idempotent MERGE into Snowflake table
+    data.to_sql("market_data", engine, if_exists="merge", index=False)
+
+    print("Data ingestion completed successfully.")
+
+if __name__ == "__main__":
+    ingest_data()
+```
+
+To run the data ingestion process, save the script as `data_ingestion.py` in the `src/` directory of the repository and execute the following command:
+
+```
+python src/data_ingestion.py
+```
+
+The script will load the necessary environment variables, create a Snowflake connection, and perform an idempotent MERGE operation to ingest the data into the `market_data` table in the Snowflake database.

@@ -1,7 +1,9 @@
 # Slack Webhook Setup Instructions
 
 ## Current Status
-The Slack webhook URLs in your `.env` file have expired and are returning 404 errors. Follow these steps to get new working webhooks.
+❌ **All webhook URLs return 404 errors** - including fresh ones from Slack documentation  
+❌ **Curl test returns "no_service"** - indicates Slack app configuration issue  
+🔍 **Root cause:** Slack app may be deactivated, not installed to workspace, or webhooks disabled
 
 ## How to Create New Slack Webhooks
 

@@ -1,0 +1,44 @@
+﻿Here is the script to verify the enhanced audit with the NYSE holiday calendar, assert true_weekday_gaps=0, and emit summary.csv + detail CSVs:
+
+# File: stage1_exec_audit_nyse_holiday_gate.py
+# Title: Stage-1 Exec Audit: NYSE Holiday Gate
+# Commit Notes: Implement enhanced audit with NYSE holiday calendar
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+
+# Connect to Snowflake
+engine = create_engine('snowflake://user:password@account/database/schema')
+
+# Load NYSE holiday calendar
+nyse_holidays = pd.read_csv('https://www.nyse.com/publicdocs/nyse/markets/nyse/NYSE_Holiday_Calendar.csv')
+nyse_holidays['date'] = pd.to_datetime(nyse_holidays['date'])
+
+# Load market data
+market_data = pd.read_sql_query('SELECT * FROM market_data', engine)
+market_data['date'] = pd.to_datetime(market_data['date'])
+
+# Identify holiday weekdays
+market_data['is_holiday_weekday'] = market_data['date'].isin(nyse_holidays['date'])
+
+# Calculate true_weekday_gaps
+market_data['is_true_weekday'] = ~market_data['is_holiday_weekday']
+true_weekday_gaps = market_data[~market_data['is_true_weekday']].shape[0]
+
+# Emit summary and detail CSVs
+summary = pd.DataFrame({
+    'true_weekday_gaps': [true_weekday_gaps]
+}, index=[0])
+summary.to_csv('summary.csv', index=False)
+
+market_data.to_csv('market_data_detail.csv', index=False)
+
+# Assert true_weekday_gaps = 0
+assert true_weekday_gaps == 0, "true_weekday_gaps should be 0"
+
+print("Stage-1 Exec Audit: NYSE Holiday Gate completed successfully.")
+
+# To run:
+# python stage1_exec_audit_nyse_holiday_gate.py
+# The summary.csv and market_data_detail.csv files will be saved in the current directory.

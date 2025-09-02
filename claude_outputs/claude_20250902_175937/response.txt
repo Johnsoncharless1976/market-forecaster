@@ -1,0 +1,81 @@
+﻿Here are the scripts to expand the audits, update the summary.csv, and add failing metrics to trigger non-zero exit in CI:
+
+File: `data_ingestion_audit.py`
+Title: Expanded Data Ingestion Audit
+Commit Notes: Implemented expanded audits for data ingestion process, including checks for duplicates, gaps, schema, and thresholds. Updated summary.csv with explicit counts, and added failing metrics to trigger non-zero exit in CI.
+
+```python
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+
+# Connect to Snowflake
+engine = create_engine('snowflake://user:password@account/database/schema')
+
+# Load data
+df = pd.read_sql_query("SELECT * FROM market_data", engine)
+
+# Audit checks
+def check_duplicates(df):
+    duplicate_count = df.duplicated().sum()
+    return duplicate_count
+
+def check_gaps(df):
+    gap_count = df['true_weekday'].diff().ne(1).sum()
+    return gap_count
+
+def check_schema(df):
+    schema_errors = 0
+    required_columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'true_weekday']
+    for col in required_columns:
+        if col not in df.columns:
+            print(f"Error: Column '{col}' not found in the data.")
+            schema_errors += 1
+    return schema_errors
+
+def check_thresholds(df):
+    threshold_errors = 0
+    if df['open'].min() < 0:
+        print("Error: Negative open price detected.")
+        threshold_errors += 1
+    if df['high'].min() < 0:
+        print("Error: Negative high price detected.")
+        threshold_errors += 1
+    if df['low'].min() < 0:
+        print("Error: Negative low price detected.")
+        threshold_errors += 1
+    if df['close'].min() < 0:
+        print("Error: Negative close price detected.")
+        threshold_errors += 1
+    if df['volume'].min() < 0:
+        print("Error: Negative volume detected.")
+        threshold_errors += 1
+    return threshold_errors
+
+# Run audits
+duplicate_count = check_duplicates(df)
+gap_count = check_gaps(df)
+schema_errors = check_schema(df)
+threshold_errors = check_thresholds(df)
+
+# Update summary.csv
+summary = pd.DataFrame({
+    'Metric': ['Duplicate Count', 'Gap Count', 'Schema Errors', 'Threshold Errors'],
+    'Value': [duplicate_count, gap_count, schema_errors, threshold_errors]
+})
+summary.to_csv('summary.csv', index=False)
+
+# Trigger non-zero exit on failing metrics
+exit_code = 0
+if duplicate_count > 0 or gap_count > 0 or schema_errors > 0 or threshold_errors > 0:
+    exit_code = 1
+exit(exit_code)
+```
+
+To run the script, save it in the `scripts` directory of your repository and execute the following command:
+
+```
+python scripts/data_ingestion_audit.py
+```
+
+The script will save the updated `summary.csv` file in the root directory of your repository.

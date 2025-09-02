@@ -1,0 +1,16 @@
+﻿{
+    "temperature":  0.2,
+    "messages":  [
+                     {
+                         "content":  [
+                                         {
+                                             "text":  "",
+                                             "type":  "text"
+                                         }
+                                     ],
+                         "role":  "user"
+                     }
+                 ],
+    "model":  "claude-3-haiku-20240307",
+    "max_tokens":  1800
+}

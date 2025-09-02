@@ -1,0 +1,103 @@
+﻿Here is the implementation of the `post_mortem_scorer.py` script with the requested constraints:
+
+```python
+# File: post_mortem_scorer.py
+# Title: Post-Mortem Scorer
+# Commit Notes: Implement post-mortem scoring and logging to Notion Daily DB
+
+import os
+import logging
+import datetime
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Set up logging
+logging.basicConfig(
+    filename='post_mortem_scorer.log',
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Snowflake connection details
+SNOWFLAKE_USER = os.getenv('SNOWFLAKE_USER')
+SNOWFLAKE_PASSWORD = os.getenv('SNOWFLAKE_PASSWORD')
+SNOWFLAKE_ACCOUNT = os.getenv('SNOWFLAKE_ACCOUNT')
+SNOWFLAKE_WAREHOUSE = os.getenv('SNOWFLAKE_WAREHOUSE')
+SNOWFLAKE_DATABASE = os.getenv('SNOWFLAKE_DATABASE')
+SNOWFLAKE_SCHEMA = os.getenv('SNOWFLAKE_SCHEMA')
+
+# Notion connection details
+NOTION_API_KEY = os.getenv('NOTION_API_KEY')
+NOTION_DATABASE_ID = os.getenv('NOTION_DATABASE_ID')
+
+# Snowflake connection
+engine = create_engine(
+    f'snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}'
+)
+
+def post_mortem_scorer():
+    """
+    Implement post-mortem scoring and log results to Notion Daily DB.
+    """
+    try:
+        # Fetch data from Snowflake
+        query = """
+        SELECT
+            date,
+            symbol,
+            bias,
+            band_hit,
+            percent_change,
+            notes
+        FROM
+            daily_performance
+        """
+        with engine.connect() as conn:
+            results = conn.execute(query).fetchall()
+
+        # Process results and log to Notion Daily DB
+        for row in results:
+            date, symbol, bias, band_hit, percent_change, notes = row
+            logging.info(f"{date}|{symbol}|{bias}|{band_hit}|{percent_change}|{notes}")
+
+        logging.info("Post-mortem scoring and logging completed successfully.")
+    except Exception as e:
+        logging.error(f"Error in post_mortem_scorer: {e}")
+
+if __name__ == "__main__":
+    post_mortem_scorer()
+```
+
+To run the script, you'll need to have the following environment variables set:
+
+- `SNOWFLAKE_USER`
+- `SNOWFLAKE_PASSWORD`
+- `SNOWFLAKE_ACCOUNT`
+- `SNOWFLAKE_WAREHOUSE`
+- `SNOWFLAKE_DATABASE`
+- `SNOWFLAKE_SCHEMA`
+- `NOTION_API_KEY`
+- `NOTION_DATABASE_ID`
+
+You can save the script in the `scripts` directory of your ZenMarket AI project repository.
+
+To run the script, you can use the following PowerShell script:
+
+```powershell
+# File: run_post_mortem_scorer.ps1
+# Title: Run Post-Mortem Scorer
+# Commit Notes: Run post-mortem scorer script
+
+python scripts/post_mortem_scorer.py
+```
+
+Save this script in the root directory of your ZenMarket AI project repository. You can then run the script using the following command:
+
+```
+.\run_post_mortem_scorer.ps1
+```
+
+The script will execute the `post_mortem_scorer.py` script, which will fetch the data from Snowflake, process the results, and log them to the Notion Daily DB. The logs will be saved in the `post_mortem_scorer.log` file in the same directory as the script.

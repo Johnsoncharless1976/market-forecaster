@@ -1,0 +1,35 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five clear facts:
+- No duplicate data points detected.
+- No missing data on holidays or weekends.
+- No null prices in the data.
+- OHLC (open, high, low, close) data passed sanity checks.
+- No gaps in the true trading day data.
+
+2) STATUS: Green
+The data ingestion process appears to be working as expected.
+
+3) Remediation Plan: None required.
+
+4) Metrics:
+- All counts are zero, indicating no issues.
+- Holiday weekdays and true weekday gaps are both zero.
+
+5) Executive Headline:
+The Stage-1 (Data Ingestion) audit shows the data is being ingested correctly with no significant issues.
+
+
+
+STATUS: n/a
+
+TASK:
+CI: Forecast Jobs
+Add GitLab CI job to run forecast writer + forecast audit on schedule; publish artifacts to audit_exports/forecast_*; fail pipeline on Red.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

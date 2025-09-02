@@ -1,0 +1,1 @@
+﻿Hello Claude, please respond with a simple test message to verify the API connection is working.

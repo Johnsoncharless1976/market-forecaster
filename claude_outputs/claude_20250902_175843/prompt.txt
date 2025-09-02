@@ -1,0 +1,35 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five Clearest Facts:
+- No duplicate data points were found.
+- There were no missing data points on holidays or weekends.
+- All prices were non-null.
+- OHLC (Open, High, Low, Close) data passed sanity checks.
+- There were no gaps in the true weekday data.
+
+STATUS: Green
+The Stage-1 (Data Ingestion) EXEC audit results indicate a successful data ingestion process with no major issues.
+
+Remediation Plan: N/A
+
+Metrics:
+- All counts are zero, indicating no gaps, duplicates, or rejected data points.
+- The true_weekday_gaps count is zero, which is the key metric for this audit.
+
+Executive Headline:
+The Stage-1 (Data Ingestion) EXEC audit results show a clean and complete data ingestion process.
+
+
+
+STATUS: Green
+
+TASK:
+Stage-3 Forecast Audit
+Create forecast_audit.py scoring latest forecasts vs actuals (hit-rate, MAE) and emit forecast_audit_summary.csv with STATUS rules; console report.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

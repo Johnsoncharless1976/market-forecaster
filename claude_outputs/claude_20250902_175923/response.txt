@@ -1,0 +1,156 @@
+﻿File: `alert_forecast_band_break.py`
+Title: Forecast Band Break Alert
+Commit Notes: Implement intraday watcher to post Slack alert on price exiting forecast band
+
+```python
+"""
+Forecast Band Break Alert
+
+This script implements an intraday watcher that monitors the price and posts a Slack alert
+if the price exits the forecast band by a specified percentage.
+
+The script assumes the following:
+- Price data is available in a Snowflake table
+- Forecast band data is also available in a Snowflake table
+- Slack webhook URL is stored as an environment variable
+
+To run this script:
+1. Set the required environment variables:
+   - SLACK_WEBHOOK_URL: Slack webhook URL for posting alerts
+2. Run the script from the command line:
+   python alert_forecast_band_break.py
+
+The script will run continuously, checking the price against the forecast band every minute.
+Alerts will be posted to the specified Slack channel whenever the price exits the band.
+"""
+
+import os
+import time
+import logging
+from datetime import datetime, timedelta
+from sqlalchemy import create_engine, text
+
+# Set up logging
+logging.basicConfig(
+    filename='alert_forecast_band_break.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Snowflake connection details
+SNOWFLAKE_HOST = 'your-snowflake-host'
+SNOWFLAKE_USER = 'your-snowflake-user'
+SNOWFLAKE_PASSWORD = 'your-snowflake-password'
+SNOWFLAKE_DATABASE = 'your-snowflake-database'
+SNOWFLAKE_SCHEMA = 'your-snowflake-schema'
+
+# Slack webhook URL
+SLACK_WEBHOOK_URL = os.environ.get('SLACK_WEBHOOK_URL')
+
+# Forecast band break percentage
+FORECAST_BAND_BREAK_PCT = 2  # 2% price change
+
+# Snowflake table names
+PRICE_TABLE = 'price_data'
+FORECAST_TABLE = 'forecast_data'
+
+# Create Snowflake engine
+engine = create_engine(
+    f'snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_HOST}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}'
+)
+
+def get_current_price():
+    """
+    Fetch the current price from the Snowflake table.
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(f"SELECT price FROM {PRICE_TABLE} ORDER BY timestamp DESC LIMIT 1"))
+        return result.fetchone()[0]
+
+def get_forecast_band():
+    """
+    Fetch the current forecast band from the Snowflake table.
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text(f"SELECT lower_bound, upper_bound FROM {FORECAST_TABLE} ORDER BY timestamp DESC LIMIT 1"))
+        row = result.fetchone()
+        return row[0], row[1]
+
+def post_slack_alert(message):
+    """
+    Post a message to the Slack channel using the provided webhook URL.
+    """
+    import requests
+    payload = {'text': message}
+    requests.post(SLACK_WEBHOOK_URL, json=payload)
+
+def main():
+    logging.info('Starting forecast band break alert watcher...')
+
+    while True:
+        try:
+            current_price = get_current_price()
+            lower_bound, upper_bound = get_forecast_band()
+
+            if current_price < lower_bound * (1 - FORECAST_BAND_BREAK_PCT / 100) or \
+               current_price > upper_bound * (1 + FORECAST_BAND_BREAK_PCT / 100):
+                message = f'Price has exited the forecast band! Current price: {current_price}, Lower bound: {lower_bound}, Upper bound: {upper_bound}'
+                post_slack_alert(message)
+                logging.info(message)
+
+        except Exception as e:
+            logging.error(f'Error in forecast band break alert watcher: {e}')
+
+        time.sleep(60)  # Check every minute
+
+if __name__ == '__main__':
+    main()
+```
+
+File: `run_alert_forecast_band_break.ps1`
+Title: Run Forecast Band Break Alert
+Commit Notes: PowerShell script to run the forecast band break alert watcher
+
+```powershell
+# Set the required environment variables
+$env:SLACK_WEBHOOK_URL = 'your-slack-webhook-url'
+
+# Run the Python script
+python .\alert_forecast_band_break.py
+```
+
+To run the forecast band break alert watcher:
+
+1. Save the `alert_forecast_band_break.py` script in your project's repository.
+2. Save the `run_alert_forecast_band_break.ps1` PowerShell script in the same directory.
+3. Open a PowerShell terminal, navigate to the directory containing the scripts, and run the PowerShell script:
+
+   ```
+   .\run_alert_forecast_band_break.ps1
+   ```
+
+The script will continuously monitor the price data and forecast band in Snowflake, and post a Slack alert whenever the price exits the forecast band by the specified percentage.
+
+The logs will be written to the `alert_forecast_band_break.log` file in the same directory as the Python script.
+
+Suggested Mitigation:
+If the price exits the forecast band, the following mitigation steps can be taken:
+
+1. Investigate the reason for the price movement:
+   - Check for any market events or news that may have caused the price change.
+   - Analyze the trading volume and volatility to understand the market conditions.
+
+2. Review the forecast model:
+   - Evaluate the model's performance and accuracy in light of the price movement.
+   - Consider updating the model or the input data to improve the forecast accuracy.
+
+3. Adjust the trading strategy:
+   - If the price movement is significant, consider adjusting the trading strategy to adapt to the new market conditions.
+   - This may involve updating the risk management parameters, position sizing, or other trading rules.
+
+4. Monitor the situation closely:
+   - Continue to monitor the price and forecast data closely to identify any further deviations.
+   - Adjust the mitigation plan as needed based on the ongoing market conditions.
+
+By implementing this forecast band break alert system, the team can quickly identify and respond to significant price movements, helping to improve the overall performance of the ZenMarket AI system.

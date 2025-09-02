@@ -1,0 +1,73 @@
+﻿Here is the weekly rollup script for the ZenMarket AI build:
+
+# File: weekly_rollup.py
+# Title: Weekly Rollup for ZenMarket AI
+# Commit Notes: Generates weekly rollup report for audits, forecasts, and post-mortems.
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+from datetime import datetime, timedelta
+
+# Connect to Snowflake
+engine = create_engine('snowflake://user:password@account/database/schema')
+
+# Get audit summary
+audit_query = """
+SELECT * 
+FROM audit_summary
+ORDER BY audit_date DESC
+LIMIT 1
+"""
+audit_df = pd.read_sql(audit_query, engine)
+
+# Get forecast summary
+forecast_query = """
+SELECT *
+FROM forecast_summary
+ORDER BY forecast_date DESC
+LIMIT 1
+"""
+forecast_df = pd.read_sql(forecast_query, engine)
+
+# Get post-mortem summary
+postmortem_query = """
+SELECT *
+FROM postmortem_summary
+ORDER BY postmortem_date DESC
+LIMIT 1
+"""
+postmortem_df = pd.read_sql(postmortem_query, engine)
+
+# Compile weekly rollup
+rollup = pd.DataFrame({
+    'Audit Summary': [audit_df.to_markdown(index=False)],
+    'Forecast Summary': [forecast_df.to_markdown(index=False)],
+    'Post-Mortem Summary': [postmortem_df.to_markdown(index=False)]
+})
+
+# Save to Notion report
+rollup.to_csv('weekly_rollup.md', index=False, header=False)
+
+# Post Slack digest
+slack_message = f"""
+Weekly Rollup for ZenMarket AI:
+
+*Audit Summary*
+{audit_df.to_markdown(index=False)}
+
+*Forecast Summary* 
+{forecast_df.to_markdown(index=False)}
+
+*Post-Mortem Summary*
+{postmortem_df.to_markdown(index=False)}
+"""
+
+# Send to Slack (using a Slack API client)
+slack_client.chat_postMessage(channel='#zenmarket-ai', text=slack_message)
+
+print('Weekly rollup complete. Report saved to weekly_rollup.md')
+
+# To run:
+# python weekly_rollup.py
+# Output will be saved to weekly_rollup.md in the current directory.

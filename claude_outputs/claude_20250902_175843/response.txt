@@ -1,0 +1,72 @@
+﻿Here is the `forecast_audit.py` script to perform the Stage-3 Forecast Audit:
+
+```python
+"""
+File: forecast_audit.py
+Title: Stage-3 Forecast Audit
+Commit Notes: Implements Stage-3 Forecast Audit to score latest forecasts vs actuals.
+"""
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+from datetime import datetime
+
+# Connect to Snowflake database
+engine = create_engine('snowflake://user:password@account/database/schema')
+
+# Load forecast and actual data
+forecast_df = pd.read_sql_query("SELECT * FROM forecast_table", engine)
+actual_df = pd.read_sql_query("SELECT * FROM actual_table", engine)
+
+# Merge forecast and actual data
+merged_df = pd.merge(forecast_df, actual_df, on=['product_id', 'date'], how='inner')
+
+# Calculate forecast metrics
+merged_df['error'] = merged_df['actual'] - merged_df['forecast']
+merged_df['abs_error'] = abs(merged_df['error'])
+hit_rate = (merged_df['error'].abs() <= 0.1).mean()
+mae = merged_df['abs_error'].mean()
+
+# Determine status based on metrics
+if hit_rate >= 0.8 and mae <= 5:
+    status = 'Green'
+elif hit_rate >= 0.7 and mae <= 10:
+    status = 'Yellow'
+else:
+    status = 'Red'
+
+# Create audit summary
+audit_summary = {
+    'Five Clearest Facts': [
+        'Forecast and actual data were successfully merged.',
+        f'Hit rate (forecast within 10% of actual): {hit_rate:.2%}',
+        f'Mean Absolute Error (MAE): {mae:.2f}',
+        f'Overall status: {status}'
+    ],
+    'Status': status,
+    'Remediation Plan': 'N/A' if status == 'Green' else 'Review forecast model and data quality',
+    'Metrics': {
+        'hit_rate': hit_rate,
+        'mae': mae
+    }
+}
+
+# Save audit summary to CSV
+audit_summary_df = pd.DataFrame.from_dict(audit_summary, orient='index').T
+audit_summary_df.to_csv('forecast_audit_summary.csv', index=False)
+
+# Print audit summary to console
+print('Forecast Audit Summary:')
+print(audit_summary_df.to_string(index=False))
+```
+
+To run the script, save it in your project repository and execute the following command in your terminal:
+
+```
+python forecast_audit.py
+```
+
+The script will connect to the Snowflake database, load the forecast and actual data, calculate the forecast metrics, and generate an audit summary. The audit summary will be saved to the `forecast_audit_summary.csv` file in the same directory as the script, and the summary will also be printed to the console.
+
+The script is designed to be idempotent, meaning that running it multiple times will not produce any unwanted side effects. The Snowflake connection details (user, password, account, database, and schema) should be replaced with your own credentials.
