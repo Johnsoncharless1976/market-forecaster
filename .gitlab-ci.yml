@@ -1,160 +1,112 @@
-# .gitlab-ci.yml — ZenMarket Forecaster CI/CD
-# Branch: perf/chopguard-v0.2.1
+# .gitlab-ci.yml — ZenMarket AI / ZenFactory scheduled runs
+# - Supports Windows shell runners (PowerShell) via job: roadmap_windows
+# - Supports Docker/Linux runners (PowerShell Core image) via job: roadmap_linux_pwsh
+# - Create two Schedules in GitLab UI: 08:40 ET and 12:30 ET (Mon–Fri)
+# - Set all secrets as CI/CD Variables (masked): ANTHROPIC_API_KEY, SNOWFLAKE_*, NOTION_*, SLACK_WEBHOOK_URL1..3, etc.
 
-# ---------- Global vars (must be top-level, NOT under `default`) ----------
-variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-  # Gate: fail when weekday_gaps > 0 if set to 'strict'. Default 'off' so scheduled/main
-  # pipelines won't fail the whole pipeline unless you opt-in.
-  ENFORCE_GAPS: "off"
+stages: [setup, roadmap]
 
-# ---------- Stage order (add the missing 'reports' stage) ----------
-stages:
-  - build
-  - test
-  - deploy
-  - exec
-  - reports
-
-# ---------- Defaults applied to all jobs ----------
 default:
-  image: python:3.11
+  interruptible: true
   cache:
-    key: "$CI_JOB_IMAGE"
+    key: "$CI_PROJECT_NAME-pip-cache"
     paths:
+      - .venv/
       - .cache/pip
+    policy: pull-push
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - audit_exports/**
+      - output/**
+      - logs/**
+      - vscode_snowflake_starter/audit_exports/**
+
+variables:
+  PIP_CACHE_DIR: ".cache/pip"
+  ZENFACTORY_MODE: "ROADMAP"
+  MAX_STEPS: "10"
+  AUTO_NEXT: "1"
+  # You can override ANTHROPIC_MODEL at the project/group level if desired:
+  ANTHROPIC_MODEL: "claude-3-haiku-20240307"
+
+# -------------------------------------------
+# Windows self-hosted runner (shell = PowerShell)
+# Requires a runner registered with tag: windows
+# -------------------------------------------
+roadmap_windows:
+  stage: roadmap
+  tags: ["windows"]
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_FACTORY_MANUALLY == "1"'   # allow manual trigger via variable
+  script:
+    # 1) Create/refresh .env from CI variables (only write keys that exist)
+    - |
+      $keys = @(
+        "ANTHROPIC_API_KEY","ANTHROPIC_MODEL",
+        "SNOWFLAKE_ACCOUNT","SNOWFLAKE_USER","SNOWFLAKE_PASSWORD","SNOWFLAKE_PRIVATE_KEY_PATH","SNOWFLAKE_PRIVATE_KEY_PASSPHRASE",
+        "SNOWFLAKE_WAREHOUSE","SNOWFLAKE_DATABASE","SNOWFLAKE_SCHEMA","SNOWFLAKE_ROLE",
+        "SLACK_WEBHOOK_URL","SLACK_WEBHOOK_URL1","SLACK_WEBHOOK_URL2","SLACK_WEBHOOK_URL3",
+        "NOTION_TOKEN","NOTION_AUDIT_DB_ID","NOTION_DAILY_DB_ID","NOTION_PROMPT_DB_ID",
+        "BAND_PCT","HIT_BAND_BPS","POLYGON_API_KEY"
+      )
+      $lines = @()
+      foreach($k in $keys){ $v = [Environment]::GetEnvironmentVariable($k); if($v){ $lines += "$k=$v" } }
+      if($lines.Count -gt 0){ $lines -join "`n" | Set-Content -Path .env -Encoding UTF8 }
+      Write-Host "Wrote .env with $($lines.Count) keys"
+
+    # 2) Run the 10-step roadmap (hands-free)
+    - |
+      $env:ZENFACTORY_MODE="ROADMAP"
+      $env:MAX_STEPS="10"
+      $env:AUTO_NEXT="1"
+      if (Test-Path .\start-zenfactory.ps1) {
+        pwsh -NoProfile -File .\start-zenfactory.ps1
+      } else {
+        pwsh -NoProfile -File .\zenfactory-10x.ps1
+      }
+
+# ----------------------------------------------------------
+# Docker/Linux runner using Microsoft PowerShell image + Python
+# Works on shared runners with Docker executor (no Windows req)
+# ----------------------------------------------------------
+roadmap_linux_pwsh:
+  stage: roadmap
+  image: mcr.microsoft.com/powershell:7.4-ubuntu-22.04
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_FACTORY_MANUALLY == "1"'
   before_script:
-    - python --version
-    - pip install --upgrade pip
-    - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
-    - export PYTHONPATH="$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-    - echo "PYTHONPATH=$PYTHONPATH"
-
-# ---------- Exec: run the audit ----------
-audit_cli:
-  stage: exec
+    # Install Python and venv tools for your repo's scripts
+    - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 python3-venv python3-pip ca-certificates && rm -rf /var/lib/apt/lists/*
   script:
-    - echo "=== EXEC START ==="
-    - python -c "import snowflake; print('snowflake import OK')"
-    - python vscode_snowflake_starter/src/exec_audit_summary.py
-    - AUDIT_DIR="$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)"
-    - echo "AUDIT_DIR=$AUDIT_DIR" | tee exec.env
-    - echo "EXEC_READY=true" >> exec.env
-    # Gate (optional failure) — controlled by ENFORCE_GAPS (off|strict)
+    # 1) Create/refresh .env from CI variables (only write keys that exist)
     - |
-      GAPS=$(awk -F, '$1=="weekday_gaps"{print $2}' "$AUDIT_DIR/summary.csv")
-      echo "weekday_gaps=$GAPS (enforce=$ENFORCE_GAPS)"
-      if [ "${ENFORCE_GAPS}" = "strict" ] && [ "${GAPS:-0}" -gt 0 ]; then
-        echo "❌ Gaps detected ($GAPS). Exiting 1 per policy."
-        exit 1
-      fi
-    - echo "=== EXEC DONE ==="
-  artifacts:
-    when: always
-    paths:
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
-    reports:
-      dotenv: exec.env
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'      # run on the feature branch
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'      # and on MRs
-
-# ---------- Reports: post a Slack summary (skips if no webhook) ----------
-slack_audit_summary:
-  stage: reports
-  needs: ["audit_cli"]
-  when: always
-  allow_failure: true           # never block pipelines on notification
-  script:
+      pwsh -NoLogo -NoProfile -Command @'
+      $keys = @(
+        "ANTHROPIC_API_KEY","ANTHROPIC_MODEL",
+        "SNOWFLAKE_ACCOUNT","SNOWFLAKE_USER","SNOWFLAKE_PASSWORD","SNOWFLAKE_PRIVATE_KEY_PATH","SNOWFLAKE_PRIVATE_KEY_PASSPHRASE",
+        "SNOWFLAKE_WAREHOUSE","SNOWFLAKE_DATABASE","SNOWFLAKE_SCHEMA","SNOWFLAKE_ROLE",
+        "SLACK_WEBHOOK_URL","SLACK_WEBHOOK_URL1","SLACK_WEBHOOK_URL2","SLACK_WEBHOOK_URL3",
+        "NOTION_TOKEN","NOTION_AUDIT_DB_ID","NOTION_DAILY_DB_ID","NOTION_PROMPT_DB_ID",
+        "BAND_PCT","HIT_BAND_BPS","POLYGON_API_KEY"
+      )
+      $lines = @()
+      foreach($k in $keys){ $v = [Environment]::GetEnvironmentVariable($k); if($v){ $lines += "$k=$v" } }
+      if($lines.Count -gt 0){ $lines -join "`n" | Set-Content -Path .env -Encoding UTF8 }
+      Write-Host "Wrote .env with $($lines.Count) keys"
+      '@
+    # 2) Run the 10-step roadmap (hands-free) with pwsh
     - |
-      if [ -z "$SLACK_WEBHOOK_URL" ]; then
-        echo "No SLACK_WEBHOOK_URL set. Skipping Slack notification."; exit 0
-      fi
-      # Resolve AUDIT_DIR if not present in env for any reason
-      : "${AUDIT_DIR:=$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)}"
-      echo "Using AUDIT_DIR=$AUDIT_DIR"
-      # Build a short one-line status from summary.csv
-      SUMMARY="$(tail -n +2 "$AUDIT_DIR/summary.csv" | tr '\n' ' ' | sed 's/,/=/g;s/ $//')"
-      REPORT_URL="${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${AUDIT_DIR}/REPORT_EXEC.md"
-      TEXT="ZenMarket Audit • ${CI_PROJECT_PATH} • ${CI_COMMIT_REF_NAME}
-      Summary: ${SUMMARY}
-      Report: ${REPORT_URL}"
-      echo "Posting to Slack..."
-      curl -sS -X POST -H 'Content-type: application/json' \
-        --data "$(jq -cn --arg t "$TEXT" '{text:$t}')" \
-        "$SLACK_WEBHOOK_URL"
-  artifacts:
-    when: always
-    paths:
-      - "vscode_snowflake_starter/audit_exports/"
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-
-# -------------------------------
-# Stage: reports (Notion notify)
-# -------------------------------
-notion_audit_summary:
-  stage: reports
-  needs: ["audit_cli"]
-  when: always
-  allow_failure: true        # never block your pipeline on a notification
-  script:
-    - |
-      if [ -z "$NOTION_TOKEN" ] || [ -z "$NOTION_PARENT_PAGE_ID" ]; then
-        echo "No NOTION_TOKEN/NOTION_PARENT_PAGE_ID set. Skipping Notion."; exit 0
-      fi
-
-      # Find the latest audit folder if AUDIT_DIR isn't in env for any reason
-      : "${AUDIT_DIR:=$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)}"
-      echo "Using AUDIT_DIR=$AUDIT_DIR"
-
-      # Build a short one-line summary: duplicates=0 null_prices=0 ohlc_sanity=0 weekday_gaps=XX weekend_rows=0
-      SUMMARY="$(tail -n +2 "$AUDIT_DIR/summary.csv" | tr '\n' ' ' | sed 's/,/=/g;s/ $//')"
-      REPORT_URL="${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${AUDIT_DIR}/REPORT_EXEC.md"
-
-      python - <<'PY'
-      import os, json, requests, datetime
-      token = os.environ["NOTION_TOKEN"]
-      parent_page = os.environ["NOTION_PARENT_PAGE_ID"]
-      summary = os.environ.get("SUMMARY", "")
-      report_url = os.environ.get("REPORT_URL", "")
-      project = os.environ.get("CI_PROJECT_PATH", "")
-      branch = os.environ.get("CI_COMMIT_REF_NAME", "")
-      ts = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-      title = f"ZenMarket Audit • {project} • {branch} • {ts}"
-      body = f"{summary}\n\nReport: {report_url}"
-
-      headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Notion-Version": "2022-06-28"
+      pwsh -NoLogo -NoProfile -Command @'
+      $env:ZENFACTORY_MODE = "ROADMAP"
+      $env:MAX_STEPS = "10"
+      $env:AUTO_NEXT = "1"
+      if (Test-Path "./start-zenfactory.ps1") {
+        ./start-zenfactory.ps1
+      } else {
+        ./zenfactory-10x.ps1
       }
-      payload = {
-        "parent": {"page_id": parent_page},
-        "properties": {"title": [{"type":"text","text":{"content": title}}]},
-        "children": [
-          {"object":"block","type":"paragraph",
-          "paragraph":{"rich_text":[{"type":"text","text":{"content": body}}]}}
-        ]
-      }
-
-      resp = requests.post("https://api.notion.com/v1/pages",
-                          headers=headers, data=json.dumps(payload))
-      print("Notion status:", resp.status_code)
-      if resp.status_code >= 300:
-          print(resp.text)
-      PY
-  artifacts:
-    when: always
-    paths:
-      - "vscode_snowflake_starter/audit_exports/"
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      '@
