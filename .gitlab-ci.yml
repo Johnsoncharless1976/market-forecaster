@@ -73,3 +73,87 @@ publish_exec_report:
   rules:
     - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# -----------------------------
+# Slack notifications (webhooks)
+# -----------------------------
+# Requirements:
+#   - CI/CD variables:
+#       SLACK_WEBHOOK_MR            -> webhook for #zen-forecaster-mr
+#       SLACK_WEBHOOK_INCIDENTS     -> webhook for #zen-forecaster-incidents
+#   - No Claude, no bot token; plain webhooks via Python stdlib
+
+slack_mr_update:
+  stage: reports
+  needs: ["audit_cli"]
+  rules:
+    # Post to MR channel for any MR-triggered pipeline (pass/fail)
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - |
+      python - <<'PY'
+      import json, os, urllib.request
+      hook = os.environ.get("SLACK_WEBHOOK_MR")
+      if not hook:
+          raise SystemExit("SLACK_WEBHOOK_MR not set")
+      title = os.environ.get("CI_MERGE_REQUEST_TITLE","(no title)")
+      iid   = os.environ.get("CI_MERGE_REQUEST_IID","?")
+      proj  = os.environ.get("CI_PROJECT_PATH","")
+      mrurl = os.environ.get("CI_MERGE_REQUEST_PROJECT_URL","") + f"/-/merge_requests/{iid}"
+      purl  = os.environ.get("CI_PIPELINE_URL","")
+      pid   = os.environ.get("CI_PIPELINE_ID","")
+      status= os.environ.get("CI_PIPELINE_STATUS","")
+      text  = f"*MR:* <{mrurl}|!{iid}> • *{title}*\n*Pipeline:* <{purl}|#{pid}> • *Status:* {status}"
+      payload = {"text":"MR Update","blocks":[{"type":"section","text":{"type":"mrkdwn","text":text}}]}
+      req = urllib.request.Request(hook, data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
+      with urllib.request.urlopen(req) as r: r.read()
+      print("Posted MR update")
+      PY
+
+slack_incident_on_fail:
+  stage: reports
+  needs: ["audit_cli","publish_exec_report"]
+  when: always
+  rules:
+    # Fire only on failed pipelines
+    - if: '$CI_PIPELINE_STATUS == "failed"'
+      when: always
+  script:
+    - |
+      python - <<'PY'
+      import os, json, urllib.request, pathlib, csv
+      hook = os.environ.get("SLACK_WEBHOOK_INCIDENTS")
+      if not hook:
+          raise SystemExit("SLACK_WEBHOOK_INCIDENTS not set")
+      proj  = os.environ.get("CI_PROJECT_PATH","")
+      branch= os.environ.get("CI_COMMIT_BRANCH","")
+      purl  = os.environ.get("CI_PIPELINE_URL","")
+      pid   = os.environ.get("CI_PIPELINE_ID","")
+      sha   = os.environ.get("CI_COMMIT_SHA","")
+      short = os.environ.get("CI_COMMIT_SHORT_SHA", sha[:8])
+      # Try to include weekday_gaps from latest summary.csv
+      gaps="n/a"
+      audit_dir = os.environ.get("AUDIT_DIR","")
+      if audit_dir:
+          try:
+              with open(str(pathlib.Path(audit_dir)/"summary.csv"), newline="") as f:
+                  for row in csv.DictReader(f):
+                      if row.get("check")=="weekday_gaps":
+                          gaps = row.get("violations","n/a")
+                          break
+          except Exception:
+              pass
+      text = (
+          f"🚨 *Pipeline FAILED*\n"
+          f"*Project:* {proj}\n*Branch:* {branch}\n"
+          f"<{purl}|Pipeline #{pid}> • <{os.environ.get('CI_PROJECT_URL')}/-/commit/{sha}|{short}>\n"
+          f"*weekday_gaps:* {gaps}"
+      )
+      payload = {"text":"PIPELINE FAILED","blocks":[
+          {"type":"header","text":{"type":"plain_text","text":"🚨 Pipeline Failed"}},
+          {"type":"section","text":{"type":"mrkdwn","text":text}}
+      ]}
+      req = urllib.request.Request(hook, data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
+      with urllib.request.urlopen(req) as r: r.read()
+      print("Posted incident alert")
+      PY
