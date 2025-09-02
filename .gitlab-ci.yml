@@ -1,82 +1,59 @@
-# .gitlab-ci.yml — ZenMarket Forecaster (stable, minimal, non-blocking)
-
-stages: [exec, reports]
-
-default:
-  image: python:3.11
-  cache:
-    key: "$CI_JOB_IMAGE"
-    paths:
-      - .cache/pip
-  before_script:
-    - python --version
-    - pip install --upgrade pip
-    - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
-    - export PYTHONPATH="$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-    - echo "PYTHONPATH=$PYTHONPATH"
-
-# -------------------
-# Stage: exec (audit)
-# -------------------
-audit_cli:
-  stage: exec
-  variables:
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    # Keep pipelines GREEN by default. Flip to "strict" when you're ready.
-    ENFORCE_GAPS: "off"
-  script:
-    - echo "=== EXEC START ==="
-    - python -c "import snowflake; print('snowflake import OK')"
-    - python vscode_snowflake_starter/src/exec_audit_summary.py
-    - AUDIT_DIR="$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)"
-    - echo "AUDIT_DIR=$AUDIT_DIR"
-    - echo "AUDIT_DIR=$AUDIT_DIR" > exec.env
-    - echo "EXEC_READY=true" >> exec.env
-    - |
-      GAPS=$(awk -F, '$1=="weekday_gaps"{print $2}' "$AUDIT_DIR/summary.csv")
-      echo "weekday_gaps=$GAPS (enforce=$ENFORCE_GAPS)"
-      if [ "${ENFORCE_GAPS}" = "strict" ] && [ "${GAPS:-0}" -gt 0 ]; then
-        echo "❌ Gaps detected ($GAPS). Exiting 1 per policy."
-        exit 1
-      else
-        echo "✅ Gate passed."
-      fi
-    - echo "=== EXEC DONE ==="
-  # <- ensures the pipeline CONTINUES even if the gate exits 1
-  allow_failure: true
-  artifacts:
-    when: always
-    paths:
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
-      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
-    reports:
-      dotenv: exec.env
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-
-# ----------------------
-# Stage: reports (print)
-# ----------------------
-publish_exec_report:
+# -----------------------------
+# Stage: reports (Slack notify)
+# -----------------------------
+slack_audit_summary:
   stage: reports
-  needs: ["audit_cli"]     # fetch artifacts even if audit_cli "failed"
-  when: always             # always run (pass or fail)
-  script:
-    - echo "EXEC_READY=${EXEC_READY}"
-    - echo "AUDIT_DIR=${AUDIT_DIR}"
-    - test -n "$AUDIT_DIR" -a -d "$AUDIT_DIR" || { echo "No AUDIT_DIR; nothing to print."; exit 0; }
-    - echo "===== REPORT_EXEC.md (head) ====="
-    - head -50 "$AUDIT_DIR/REPORT_EXEC.md" || true
-    - echo "===== summary.csv (tail) ====="
-    - tail -20 "$AUDIT_DIR/summary.csv" || true
-  artifacts:
-    when: always
-    paths:
-      - "${AUDIT_DIR:-vscode_snowflake_starter/audit_exports}/"
-    expire_in: 1 week
+  needs: ["audit_cli"]     # pulls audit artifacts into this job
+  when: always
+  allow_failure: true      # Slack hiccups won't fail the pipeline
+  before_script: []        # keep it lightweight (no pip)
   rules:
     - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - |
+      if [ -z "$SLACK_WEBHOOK_AUDIT" ]; then
+        echo "SLACK_WEBHOOK_AUDIT not set; skipping Slack post."
+        exit 0
+      fi
+
+      # Resolve the latest audit dir (artifacts are available via `needs`)
+      AUDIT_DIR="${AUDIT_DIR:-$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* 2>/dev/null | head -1)}"
+      SUMMARY="${AUDIT_DIR}/summary.csv"
+      REPORT="${AUDIT_DIR}/REPORT_EXEC.md"
+
+      if [ ! -f "$SUMMARY" ]; then
+        echo "No summary.csv found; nothing to post."
+        exit 0
+      fi
+
+      GAPS=$(awk -F, '$1=="weekday_gaps"{print $2}' "$SUMMARY")
+      STATUS="✅ OK"
+      [ "${GAPS:-0}" -gt 0 ] && STATUS="🚨 GAPS=$GAPS"
+
+      # Take a small preview of the report to keep Slack tidy
+      PREVIEW=$(head -n 10 "$REPORT" | sed 's/"/\\"/g')
+
+      # Build Slack message (mrkdwn)
+      read -r -d '' PAYLOAD <<JSON || true
+      {
+        "text": "ZenMarket Audit — $STATUS",
+        "blocks": [
+          { "type": "header", "text": { "type": "plain_text", "text": "ZenMarket Audit — $STATUS" } },
+          { "type": "section",
+            "fields": [
+              { "type": "mrkdwn", "text": "*Project:*\n$CI_PROJECT_PATH" },
+              { "type": "mrkdwn", "text": "*Branch:*\n$CI_COMMIT_BRANCH" },
+              { "type": "mrkdwn", "text": "*Pipeline:*\n<$CI_PIPELINE_URL|#$CI_PIPELINE_ID>" },
+              { "type": "mrkdwn", "text": "*Commit:*\n<$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|${CI_COMMIT_SHORT_SHA:-$CI_COMMIT_SHA}>" }
+            ]
+          },
+          { "type": "section",
+            "text": { "type": "mrkdwn", "text": "*Report preview:*\n```$PREVIEW\n...```" }
+          }
+        ]
+      }
+      JSON
+
+      curl -sS -X POST -H 'Content-type: application/json' \
+        --data "$PAYLOAD" "$SLACK_WEBHOOK_AUDIT" || true
