@@ -1,13 +1,10 @@
 # .gitlab-ci.yml — ZenMarket Forecaster CI/CD (perf/chopguard-v0.2.1)
 # Gate: fail when weekday_gaps > 0 (toggle via ENFORCE_GAPS=strict|off)
 
+stages: [exec, reports]
+
 default:
   image: python:3.11
-  variables:
-    PIP_DISABLE_PIP_VERSION_CHECK: "1"
-    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-    ENFORCE_GAPS: "strict"   # set to "off" to allow gaps without failing
   cache:
     key: "$CI_JOB_IMAGE"
     paths:
@@ -18,13 +15,16 @@ default:
     - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
     - echo "PYTHONPATH=$PYTHONPATH"
 
-stages: [exec, reports]
-
 # -------------------
 # Stage: exec (audit)
 # -------------------
 audit_cli:
   stage: exec
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+    ENFORCE_GAPS: "strict"   # set to "off" to allow gaps without failing
   script:
     - echo "=== EXEC STAGE START ==="
     - python -c "import snowflake; print('snowflake import OK')"
@@ -60,6 +60,8 @@ audit_cli:
 publish_exec_report:
   stage: reports
   needs: ["audit_cli"]
+  variables:
+    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
   script:
     - echo "EXEC_READY=${EXEC_READY}"
     - test "${EXEC_READY}" = "true"
@@ -87,6 +89,8 @@ publish_exec_report:
 
 slack_mr_update:
   stage: reports
+  # Skip Python setup here to keep it lightweight
+  before_script: []
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
@@ -110,8 +114,11 @@ slack_mr_update:
 
 slack_incident_on_fail:
   stage: reports
-  needs: ["audit_cli"]     # ensure this runs even if audit_cli failed
+  # Ensure this runs even if audit_cli failed
+  needs: ["audit_cli"]
   when: always
+  # Skip Python setup here to keep it lightweight
+  before_script: []
   rules:
     - if: '$CI_PIPELINE_STATUS == "failed"'
       when: always
