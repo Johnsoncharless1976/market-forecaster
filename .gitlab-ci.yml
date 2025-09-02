@@ -1,14 +1,13 @@
 # .gitlab-ci.yml — ZenMarket Forecaster CI/CD (perf/chopguard-v0.2.1)
 # Gate: fail when weekday_gaps > 0 (toggle via ENFORCE_GAPS=strict|off)
 
-variables:
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-  ENFORCE_GAPS: "strict"   # set to "off" to allow gaps without failing
-
 default:
   image: python:3.11
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+    PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+    ENFORCE_GAPS: "strict"   # set to "off" to allow gaps without failing
   cache:
     key: "$CI_JOB_IMAGE"
     paths:
@@ -60,6 +59,7 @@ audit_cli:
 # ----------------------
 publish_exec_report:
   stage: reports
+  needs: ["audit_cli"]
   script:
     - echo "EXEC_READY=${EXEC_READY}"
     - test "${EXEC_READY}" = "true"
@@ -81,15 +81,13 @@ publish_exec_report:
 # ---------------------------------------------
 # Stage: reports (Slack notifications, webhooks)
 # ---------------------------------------------
-# Requirements:
-#   - Set masked CI/CD variables:
-#       SLACK_WEBHOOK_MR            -> webhook for #zen-forecaster-mr
-#       SLACK_WEBHOOK_INCIDENTS     -> webhook for #zen-forecaster-incidents
+# Set masked CI/CD variables in GitLab:
+#   SLACK_WEBHOOK_MR            -> webhook for #zen-forecaster-mr
+#   SLACK_WEBHOOK_INCIDENTS     -> webhook for #zen-forecaster-incidents
 
 slack_mr_update:
   stage: reports
   rules:
-    # Post to MR channel for any MR-triggered pipeline (pass/fail)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - |
@@ -112,9 +110,9 @@ slack_mr_update:
 
 slack_incident_on_fail:
   stage: reports
+  needs: ["audit_cli"]     # ensure this runs even if audit_cli failed
   when: always
   rules:
-    # Fire only on failed pipelines (even if exec job failed)
     - if: '$CI_PIPELINE_STATUS == "failed"'
       when: always
   script:
