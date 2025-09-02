@@ -1,0 +1,22 @@
+﻿ROLE
+You are a senior engineer for ZenMarket AI. Produce a baseline Stage-3 Forecast Writer that reads FEATURES_DAILY from Snowflake and writes forecasts to FORECAST_DAILY with an idempotent MERGE. Include a PowerShell runner. No placeholders.
+
+CONSTRAINTS
+- Language: Python 3.10+
+- DB via .env (dotenv): SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD or SNOWFLAKE_PRIVATE_KEY_PATH (+ passphrase if used), SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA, SNOWFLAKE_ROLE
+- Use snowflake-sqlalchemy + SQLAlchemy; build engine strictly from env (no hardcoded URIs)
+- Idempotent MERGE on (symbol, date)
+- Baseline model = persistence: forecast_{t+1} = close_t (per symbol)
+- Logging to stdout; final line EXACT: FORECAST: rows_upserted=<n> model_version=<tag>
+- Exact file paths (overwrite if exist):
+  1) vscode_snowflake_starter\src\forecast\forecast_writer.py
+  2) scripts\run_forecast.ps1
+- The runner must:
+  - Create .venv if missing; install: python-dotenv, SQLAlchemy, snowflake-connector-python, snowflake-sqlalchemy, pandas
+  - Activate venv and run the writer
+  - Exit non-zero on failure
+
+OUTPUT FORMAT
+Return two files only, each as its own fenced block, in this order:
+1) File: vscode_snowflake_starter\src\forecast\forecast_writer.py
+2) File: scripts\run_forecast.ps1

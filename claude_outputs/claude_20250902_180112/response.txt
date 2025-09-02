@@ -1,0 +1,77 @@
+﻿```python
+import os
+import logging
+from datetime import datetime
+from typing import Tuple
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+import pandas as pd
+
+load_dotenv()
+
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_PRIVATE_KEY_PATH = os.getenv("SNOWFLAKE_PRIVATE_KEY_PATH")
+SNOWFLAKE_PASSPHRASE = os.getenv("SNOWFLAKE_PASSPHRASE")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+def get_snowflake_engine() -> Tuple[create_engine, str]:
+    if SNOWFLAKE_PRIVATE_KEY_PATH:
+        engine = create_engine(
+            f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSPHRASE}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}",
+            connect_args={
+                "private_key": SNOWFLAKE_PRIVATE_KEY_PATH
+            }
+        )
+    else:
+        engine = create_engine(
+            f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}"
+        )
+    return engine, "v1.0.0"
+
+def run_forecast_writer():
+    engine, model_version = get_snowflake_engine()
+    
+    with engine.connect() as conn:
+        logging.info("Reading FEATURES_DAILY from Snowflake...")
+        features_df = pd.read_sql_table("FEATURES_DAILY", conn)
+        
+        logging.info("Generating forecasts...")
+        features_df["forecast"] = features_df["close"]
+        
+        logging.info("Upserting forecasts to FORECAST_DAILY...")
+        features_df.to_sql("FORECAST_DAILY", conn, if_exists="merge", index=False, method="multi")
+        
+        rows_upserted = len(features_df)
+        logging.info(f"FORECAST: rows_upserted={rows_upserted} model_version={model_version}")
+
+if __name__ == "__main__":
+    run_forecast_writer()
+```
+
+```powershell
+$ErrorActionPreference = "Stop"
+
+# Create virtual environment if it doesn't exist
+if (-not (Test-Path -Path ".venv")) {
+    python -m venv .venv
+}
+
+# Activate virtual environment
+. .\.venv\Scripts\Activate.ps1
+
+# Install required packages
+pip install python-dotenv SQLAlchemy snowflake-connector-python snowflake-sqlalchemy pandas
+
+# Run the forecast writer
+python .\src\forecast\forecast_writer.py
+
+# Exit with the same exit code as the script
+exit $LASTEXITCODE
+```

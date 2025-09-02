@@ -1,0 +1,30 @@
+﻿ROLE
+You are a senior engineer. Create a forecast audit that compares FORECAST_DAILY vs ACTUALS_DAILY and emits a CSV + STATUS line.
+
+CONSTRAINTS
+- Files (overwrite if exist):
+  1) vscode_snowflake_starter\src\forecast\forecast_audit.py
+  2) scripts\run_forecast_audit.ps1
+- Python uses .env Snowflake creds (dotenv) and SQLAlchemy engine; no hardcoded URIs
+- Logic:
+  - Join FORECAST_DAILY f with ACTUALS_DAILY a on (symbol, date)
+  - Metrics: MAE = mean(|a.close - f.forecast|); HitRate = share(|error| <= hit_band), where hit_band = 1.0% of a.close unless env HIT_BAND_BPS provided
+  - Emit vscode_snowflake_starter\audit_exports\forecast_audit_YYYYMMDD_HHMMSS\forecast_audit_summary.csv with:
+      metric,value
+      mae,<float>
+      hit_rate,<float>
+      rows,<int>
+  - Print EXACT one-liner: STATUS: <Green|Yellow|Red> - <reason>
+    Thresholds (defaults; allow env overrides):
+      Green: hit_rate >= 0.80 AND mae <= 0.0100
+      Yellow: hit_rate >= 0.70 AND mae <= 0.0200
+      Red: otherwise
+- Runner:
+  - Ensure .venv, install deps if missing (python-dotenv, SQLAlchemy, snowflake-connector-python, snowflake-sqlalchemy, pandas)
+  - Activate venv and run forecast_audit.py
+  - Exit non-zero if STATUS is Red
+
+OUTPUT FORMAT
+Return two files only, each as its own fenced block, in this order:
+1) File: vscode_snowflake_starter\src\forecast\forecast_audit.py
+2) File: scripts\run_forecast_audit.ps1

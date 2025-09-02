@@ -1,0 +1,83 @@
+﻿Here is the code for the forecast_audit.py file:
+
+```python
+import os
+import datetime
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
+import pandas as pd
+
+load_dotenv()
+
+# Load Snowflake credentials from .env
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+
+# Create Snowflake engine
+engine = create_engine(
+    f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}"
+)
+
+# Get hit band from environment or use default
+hit_band_bps = float(os.getenv("HIT_BAND_BPS", "100")) / 10000
+
+# Fetch data from Snowflake
+query = """
+SELECT f.symbol, f.date, f.forecast, a.close
+FROM FORECAST_DAILY f
+JOIN ACTUALS_DAILY a ON f.symbol = a.symbol AND f.date = a.date
+"""
+df = pd.read_sql_query(query, engine)
+
+# Calculate metrics
+df["error"] = abs(df["close"] - df["forecast"])
+mae = df["error"].mean()
+hit_rate = (df["error"] <= df["close"] * hit_band_bps).mean()
+rows = len(df)
+
+# Determine status
+if hit_rate >= 0.80 and mae <= 0.01:
+    status = "Green"
+    reason = "Forecast accuracy is within acceptable limits"
+elif hit_rate >= 0.70 and mae <= 0.02:
+    status = "Yellow"
+    reason = "Forecast accuracy is below target"
+else:
+    status = "Red"
+    reason = "Forecast accuracy is unacceptable"
+
+# Export summary
+export_dir = os.path.join("audit_exports", f"forecast_audit_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+os.makedirs(export_dir, exist_ok=True)
+summary_path = os.path.join(export_dir, "forecast_audit_summary.csv")
+pd.DataFrame({"metric": ["mae", "hit_rate", "rows"], "value": [mae, hit_rate, rows]}).to_csv(summary_path, index=False)
+
+# Print status
+print(f"STATUS: {status} - {reason}")
+
+# Exit non-zero if status is Red
+if status == "Red":
+    exit(1)
+```
+
+And here is the code for the run_forecast_audit.ps1 file:
+
+```powershell
+# Activate virtual environment
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies if missing
+if (-not (Get-Command python-dotenv -ErrorAction SilentlyContinue)) {
+    pip install python-dotenv sqlalchemy snowflake-connector-python snowflake-sqlalchemy pandas
+}
+
+# Run forecast audit
+python .\src\forecast\forecast_audit.py
+
+# Deactivate virtual environment
+deactivate
+```
