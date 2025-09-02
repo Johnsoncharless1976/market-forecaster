@@ -1,6 +1,8 @@
-# scripts\run_forecast.ps1
-# ZenMarket AI - Stage-3 Forecast Writer Runner
-# Ensures Python environment and dependencies, then runs forecast writer
+# ============================================
+# File: scripts\run_forecast.ps1
+# Title: Stage-3 Forecast Writer Runner
+# Description: Sets up Python environment and executes forecast writer
+# ============================================
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -10,86 +12,92 @@ function Write-Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Write-Error($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red }
 
 try {
-    Write-Info "Starting ZenMarket Forecast Writer"
+    Write-Info "Starting Stage-3 Forecast Writer Runner"
     
-    # Ensure we're in the project root
-    if (-not (Test-Path "vscode_snowflake_starter\src\forecast\forecast_writer.py")) {
-        throw "forecast_writer.py not found - ensure you're running from project root"
+    # Get script directory and project root
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    $ProjectRoot = Split-Path -Parent $ScriptDir
+    Set-Location $ProjectRoot
+    
+    Write-Info "Project root: $ProjectRoot"
+    
+    # Check if Python is available
+    try {
+        $pythonVersion = python --version 2>&1
+        Write-Info "Python found: $pythonVersion"
+    } catch {
+        Write-Error "Python not found in PATH. Please install Python 3.10+ and add to PATH."
+        exit 1
     }
     
-    # 1. Ensure virtual environment exists
-    if (-not (Test-Path ".venv")) {
-        Write-Info "Creating Python virtual environment..."
+    # Create .venv if it doesn't exist
+    $venvPath = Join-Path $ProjectRoot ".venv"
+    if (-not (Test-Path $venvPath)) {
+        Write-Info "Creating Python virtual environment at $venvPath"
         python -m venv .venv
-        if ($LASTEXITCODE -ne 0) { throw "Failed to create virtual environment" }
-    }
-    
-    # 2. Activate virtual environment
-    Write-Info "Activating virtual environment..."
-    if (Test-Path ".venv\Scripts\Activate.ps1") {
-        & ".venv\Scripts\Activate.ps1"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to create virtual environment"
+            exit 1
+        }
     } else {
-        throw "Virtual environment activation script not found"
+        Write-Info "Virtual environment already exists at $venvPath"
     }
     
-    # 3. Check and install required packages
-    Write-Info "Checking Python dependencies..."
-    $required_packages = @(
+    # Activate virtual environment
+    $activateScript = Join-Path $venvPath "Scripts\Activate.ps1"
+    if (-not (Test-Path $activateScript)) {
+        Write-Error "Virtual environment activation script not found: $activateScript"
+        exit 1
+    }
+    
+    Write-Info "Activating virtual environment"
+    & $activateScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Failed to activate virtual environment"
+        exit 1
+    }
+    
+    # Check and install required packages
+    $requiredPackages = @(
+        "python-dotenv",
+        "SQLAlchemy",
         "snowflake-connector-python",
         "snowflake-sqlalchemy", 
-        "SQLAlchemy",
-        "python-dotenv",
         "pandas"
     )
     
-    # Check if packages are installed by trying to import them
-    $missing_packages = @()
-    foreach ($package in $required_packages) {
-        $import_name = $package
-        if ($package -eq "snowflake-connector-python") { $import_name = "snowflake.connector" }
-        if ($package -eq "snowflake-sqlalchemy") { $import_name = "snowflake.sqlalchemy" }
-        if ($package -eq "python-dotenv") { $import_name = "dotenv" }
-        
-        $result = python -c "
-try:
-    import $import_name
-    print('OK')
-except ImportError:
-    print('MISSING')
-" 2>$null
-        
-        if ($result -ne "OK") {
-            $missing_packages += $package
+    Write-Info "Installing required Python packages"
+    foreach ($package in $requiredPackages) {
+        Write-Info "Installing $package"
+        pip install $package --quiet
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to install $package"
+            exit 1
         }
     }
     
-    # Install missing packages
-    if ($missing_packages.Count -gt 0) {
-        Write-Info "Installing missing packages: $($missing_packages -join ', ')"
-        pip install $missing_packages
-        if ($LASTEXITCODE -ne 0) { throw "Failed to install required packages" }
+    Write-Info "All dependencies installed successfully"
+    
+    # Run the forecast writer
+    $forecastWriter = Join-Path $ProjectRoot "vscode_snowflake_starter\src\forecast\forecast_writer.py"
+    if (-not (Test-Path $forecastWriter)) {
+        Write-Error "Forecast writer not found: $forecastWriter"
+        exit 1
+    }
+    
+    Write-Info "Running forecast writer: $forecastWriter"
+    python $forecastWriter
+    
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0) {
+        Write-Info "Forecast writer completed successfully"
     } else {
-        Write-Info "All required packages are installed"
+        Write-Error "Forecast writer failed with exit code $exitCode"
+        exit $exitCode
     }
     
-    # 4. Run the forecast writer
-    Write-Info "Running forecast writer..."
-    python "vscode_snowflake_starter\src\forecast\forecast_writer.py"
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Forecast writer failed with exit code $LASTEXITCODE"
-        exit $LASTEXITCODE
-    }
-    
-    Write-Info "Forecast writer completed successfully"
-}
-catch {
-    Write-Error "Runner failed: $($_.Exception.Message)"
+} catch {
+    Write-Error "Runner script failed: $($_.Exception.Message)"
+    Write-Error "Stack trace: $($_.ScriptStackTrace)"
     exit 1
-}
-finally {
-    # Deactivate virtual environment if it was activated
-    if (Get-Command "deactivate" -ErrorAction SilentlyContinue) {
-        deactivate
-    }
 }

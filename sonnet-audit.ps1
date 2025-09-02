@@ -99,33 +99,37 @@ function Invoke-Claude([string]$Prompt, [string]$Model = $null) {
     return @{ text = $text.Trim(); model = $Model }
 }
 
+# --- Slack Multi-Channel (clean) ---
+function Get-SlackHooks {
+    @(
+        $env:SLACK_WEBHOOK_URL,
+        $env:SLACK_WEBHOOK_URL1,
+        $env:SLACK_WEBHOOK_URL2,
+        $env:SLACK_WEBHOOK_URL3
+    ) | Where-Object { $_ -and ($_ -match '^https://hooks\.slack\.com/services/') }
+}
+
+function Mask-Hook([string]$u){
+    if (-not $u) { return "" }
+    # keep team/channel ids, mask token
+    $parts = $u -split '/'
+    if ($parts.Count -ge 7) { return "$($parts[0..5] -join '/')/******" }
+    return "hook:******"
+}
+
 function Post-MultiSlack([hashtable]$Payload) {
-    # Default to environment vars first
-    $envHooks = @($env:SLACK_WEBHOOK_URL, $env:SLACK_WEBHOOK_URL1, $env:SLACK_WEBHOOK_URL2, $env:SLACK_WEBHOOK_URL3)
-    $slackHooks = @()
-    foreach ($hook in $envHooks) {
-        if ($hook -and ($hook -match '^https://hooks\.slack\.com/services/')) {
-            $slackHooks += $hook
-        }
+    $hooks = Get-SlackHooks
+    if (-not $hooks -or @($hooks).Count -eq 0) {
+        Write-Warning "No Slack webhooks in env; skipping Slack post."
+        return
     }
-
-    # Hardwire your three known webhooks (safe fallback if envs are empty)
-    if ($slackHooks.Count -eq 0) {
-        $slackHooks = @(
-            "https://hooks.slack.com/services/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", # zen-forecaster-ops
-            "https://hooks.slack.com/services/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", # zen-forecaster-incidents
-            "https://hooks.slack.com/services/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"  # zen-forecaster-mr
-        )
-    }
-
-    $json = $Payload | ConvertTo-Json -Depth 8
-    foreach ($hook in $slackHooks) {
+    $json = $Payload | ConvertTo-Json -Depth 12
+    foreach ($h in $hooks) {
         try {
-            Write-Info "Posting to Slack: $($hook.Substring($hook.LastIndexOf('/') + 1))"
-            Invoke-RestMethod -Method Post -Uri $hook -Body $json -ContentType "application/json" | Out-Null
-            Write-Info "Posted successfully."
+            Write-Host "[INFO] Posting to Slack: $(Mask-Hook $h)"
+            Invoke-RestMethod -Method Post -Uri $h -Body $json -ContentType "application/json" | Out-Null
         } catch {
-            Write-Warn "Slack post failed: $($_.Exception.Message)"
+            Write-Warning "Slack post failed ($(Mask-Hook $h)): $($_.Exception.Message)"
         }
     }
 }
