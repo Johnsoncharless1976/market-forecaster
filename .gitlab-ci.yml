@@ -57,10 +57,36 @@ audit_cli:
 # ----------------------
 # Stage: reports (print)
 # ----------------------
-publish_exec_report:
+# Runs when audit PASSES (so you still get a summary in green pipelines)
+publish_exec_report_success:
   stage: reports
   needs: ["audit_cli"]
-  when: always               # <- print even if audit failed
+  when: on_success
+  variables:
+    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+  script:
+    - echo "EXEC_READY=${EXEC_READY}"
+    - test "${EXEC_READY}" = "true" || { echo "exec not ready"; exit 0; }
+    - echo "AUDIT_DIR=${AUDIT_DIR}"
+    - test -d "${AUDIT_DIR}" || { echo "no audit dir"; exit 0; }
+    - echo "===== REPORT_EXEC.md (head) ====="
+    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md" || true
+    - echo "===== summary.csv (tail) ====="
+    - tail -20 "${AUDIT_DIR}/summary.csv" || true
+  artifacts:
+    when: always
+    paths:
+      - "${AUDIT_DIR:-vscode_snowflake_starter/audit_exports}/"
+    expire_in: 1 week
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+
+# Runs when audit FAILS (this is the case you’re hitting)
+publish_exec_report_on_fail:
+  stage: reports
+  needs: ["audit_cli"]
+  when: on_failure
   variables:
     PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
   script:
@@ -115,7 +141,7 @@ slack_mr_update:
 slack_incident_on_fail:
   stage: reports
   needs: ["audit_cli"]        # ensure it runs after audit, even if audit failed
-  when: on_failure            # <- guaranteed to run after a failure
+  when: on_failure            # guaranteed to run after a failure
   before_script: []           # keep lightweight
   script:
     - |
