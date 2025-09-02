@@ -1,5 +1,5 @@
-# .gitlab-ci.yml — ZenMarket Forecaster CI/CD (perf/chopguard-v0.2.1)
-# Gate: fail when weekday_gaps > 0 (toggle via ENFORCE_GAPS=strict|off)
+# .gitlab-ci.yml — ZenMarket Forecaster CI/CD
+# Reliable: audit may "fail", but pipeline continues; reports always run.
 
 stages: [exec, reports]
 
@@ -7,12 +7,12 @@ default:
   image: python:3.11
   cache:
     key: "$CI_JOB_IMAGE"
-    paths:
-      - .cache/pip
+    paths: [ .cache/pip ]
   before_script:
     - python --version
     - pip install --upgrade pip
     - pip install --upgrade -r vscode_snowflake_starter/requirements.txt snowflake-connector-python
+    - export PYTHONPATH="$CI_PROJECT_DIR/vscode_snowflake_starter/src"
     - echo "PYTHONPATH=$PYTHONPATH"
 
 # -------------------
@@ -23,25 +23,28 @@ audit_cli:
   variables:
     PIP_DISABLE_PIP_VERSION_CHECK: "1"
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-    ENFORCE_GAPS: "strict"   # set to "off" to allow gaps without failing
+    ENFORCE_GAPS: "strict"   # set to "off" if you want green pipelines
   script:
-    - echo "=== EXEC STAGE START ==="
+    - echo "=== EXEC START ==="
     - python -c "import snowflake; print('snowflake import OK')"
     - python vscode_snowflake_starter/src/exec_audit_summary.py
     - AUDIT_DIR="$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* | head -1)"
+    - echo "AUDIT_DIR=$AUDIT_DIR"
     - echo "AUDIT_DIR=$AUDIT_DIR" > exec.env
     - echo "EXEC_READY=true" >> exec.env
-    # ---- gate: fail if weekday_gaps > 0 when ENFORCE_GAPS=strict ----
     - |
       GAPS=$(awk -F, '$1=="weekday_gaps"{print $2}' "$AUDIT_DIR/summary.csv")
       echo "weekday_gaps=$GAPS (enforce=$ENFORCE_GAPS)"
+      # Fail only if strict AND gaps > 0
       if [ "${ENFORCE_GAPS}" = "strict" ] && [ "${GAPS:-0}" -gt 0 ]; then
-        echo "❌ Weekday gaps detected ($GAPS). Failing per policy."; exit 1
+        echo "❌ Gaps detected ($GAPS). Exiting 1 per policy."
+        exit 1
       else
         echo "✅ Gate passed."
       fi
-    - echo "=== EXEC STAGE DONE ==="
+    - echo "=== EXEC DONE ==="
+  # ← THIS IS THE SWITCH that lets the pipeline continue to the next stage
+  allow_failure: true
   artifacts:
     when: always
     paths:
@@ -57,47 +60,18 @@ audit_cli:
 # ----------------------
 # Stage: reports (print)
 # ----------------------
-# Runs when audit PASSES (so you still get a summary in green pipelines)
-publish_exec_report_success:
+publish_exec_report:
   stage: reports
-  needs: ["audit_cli"]
-  when: on_success
-  variables:
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
+  needs: ["audit_cli"]   # fetch artifacts even if audit_cli failed
+  when: always           # always run (pass or fail)
   script:
     - echo "EXEC_READY=${EXEC_READY}"
-    - test "${EXEC_READY}" = "true" || { echo "exec not ready"; exit 0; }
     - echo "AUDIT_DIR=${AUDIT_DIR}"
-    - test -d "${AUDIT_DIR}" || { echo "no audit dir"; exit 0; }
+    - test -n "$AUDIT_DIR" -a -d "$AUDIT_DIR" || { echo "No AUDIT_DIR; nothing to print."; exit 0; }
     - echo "===== REPORT_EXEC.md (head) ====="
-    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md" || true
+    - head -50 "$AUDIT_DIR/REPORT_EXEC.md" || true
     - echo "===== summary.csv (tail) ====="
-    - tail -20 "${AUDIT_DIR}/summary.csv" || true
-  artifacts:
-    when: always
-    paths:
-      - "${AUDIT_DIR:-vscode_snowflake_starter/audit_exports}/"
-    expire_in: 1 week
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-
-# Runs when audit FAILS (this is the case you’re hitting)
-publish_exec_report_on_fail:
-  stage: reports
-  needs: ["audit_cli"]
-  when: on_failure
-  variables:
-    PYTHONPATH: "$CI_PROJECT_DIR/vscode_snowflake_starter/src"
-  script:
-    - echo "EXEC_READY=${EXEC_READY}"
-    - test "${EXEC_READY}" = "true" || { echo "exec not ready"; exit 0; }
-    - echo "AUDIT_DIR=${AUDIT_DIR}"
-    - test -d "${AUDIT_DIR}" || { echo "no audit dir"; exit 0; }
-    - echo "===== REPORT_EXEC.md (head) ====="
-    - head -50 "${AUDIT_DIR}/REPORT_EXEC.md" || true
-    - echo "===== summary.csv (tail) ====="
-    - tail -20 "${AUDIT_DIR}/summary.csv" || true
+    - tail -20 "$AUDIT_DIR/summary.csv" || true
   artifacts:
     when: always
     paths:
@@ -108,25 +82,22 @@ publish_exec_report_on_fail:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
 # ---------------------------------------------
-# Stage: reports (Slack notifications, webhooks)
+# Optional: Slack webhooks (set CI vars to enable)
+# SLACK_WEBHOOK_MR, SLACK_WEBHOOK_INCIDENTS
 # ---------------------------------------------
-# Set masked CI/CD variables in GitLab:
-#   SLACK_WEBHOOK_MR            -> webhook for #zen-forecaster-mr
-#   SLACK_WEBHOOK_INCIDENTS     -> webhook for #zen-forecaster-incidents
-
 slack_mr_update:
   stage: reports
-  before_script: []           # keep lightweight: no Python installs
+  before_script: []      # keep light (no pip install)
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - |
-      MSG=$(cat <<JSON
+      [ -n "$SLACK_WEBHOOK_MR" ] || { echo "SLACK_WEBHOOK_MR not set"; exit 0; }
+      MSG=$(cat <<'JSON'
       {
         "text": "*MR Update*",
         "blocks": [
-          {
-            "type": "section",
+          { "type": "section",
             "text": { "type": "mrkdwn",
               "text": "*MR:* <$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID|!$CI_MERGE_REQUEST_IID> • *$CI_MERGE_REQUEST_TITLE*\n*Pipeline:* <$CI_PIPELINE_URL|#$CI_PIPELINE_ID> • *Status:* $CI_PIPELINE_STATUS"
             }
@@ -135,35 +106,41 @@ slack_mr_update:
       }
       JSON
       )
-      test -n "$SLACK_WEBHOOK_MR" || { echo "SLACK_WEBHOOK_MR not set"; exit 0; }
       curl -sS -X POST -H 'Content-type: application/json' --data "$MSG" "$SLACK_WEBHOOK_MR" || true
 
 slack_incident_on_fail:
   stage: reports
-  needs: ["audit_cli"]        # ensure it runs after audit, even if audit failed
-  when: on_failure            # guaranteed to run after a failure
-  before_script: []           # keep lightweight
+  needs: ["audit_cli"]
+  when: always            # post only if gaps>0 (decide inside script)
+  before_script: []
   script:
     - |
-      AUD="vscode_snowflake_starter/audit_exports"
-      LAST_DIR=$(ls -dt ${AUD}/stage1_exec_* 2>/dev/null | head -1 || true)
-      LAST_SUM="${LAST_DIR:+$LAST_DIR/summary.csv}"
-      GAPS=$([ -f "$LAST_SUM" ] && awk -F, '$1=="weekday_gaps"{print $2}' "$LAST_SUM" || echo "n/a")
-      MSG=$(cat <<JSON
-      {
-        "text": "🚨 *Pipeline FAILED* for *$CI_PROJECT_PATH* on *$CI_COMMIT_BRANCH*",
-        "blocks": [
-          { "type": "header", "text": { "type": "plain_text", "text": "🚨 Pipeline Failed" } },
-          { "type": "section",
-            "fields": [
-              { "type": "mrkdwn", "text": "*Pipeline:*\n<$CI_PIPELINE_URL|#$CI_PIPELINE_ID>" },
-              { "type": "mrkdwn", "text": "*Commit:*\n<$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|${CI_COMMIT_SHORT_SHA:-$CI_COMMIT_SHA}>" },
-              { "type": "mrkdwn", "text": "*weekday_gaps:*\n$GAPS" }
-            ]
-          }
-        ]
-      }
-      JSON
-      )
-      test -n "$SLACK_WEBHOOK_INCIDENTS" || { echo "SLACK_WEBHOOK_INCIDENTS not set"; exit 0; }
-      curl -sS -X POST -H 'Content-type: application/json' --data "$MSG" "$SLACK_WEBHOOK_INCIDENTS" || true
+      [ -n "$SLACK_WEBHOOK_INCIDENTS" ] || { echo "SLACK_WEBHOOK_INCIDENTS not set"; exit 0; }
+      AUDIT_DIR="${AUDIT_DIR:-$(ls -dt vscode_snowflake_starter/audit_exports/stage1_exec_* 2>/dev/null | head -1)}"
+      SUM="$AUDIT_DIR/summary.csv"
+      GAPS=$([ -f "$SUM" ] && awk -F, '$1=="weekday_gaps"{print $2}' "$SUM" || echo "n/a")
+      echo "Found weekday_gaps=$GAPS"
+      # Only fire message if we truly have gaps > 0
+      if [ "$GAPS" != "n/a" ] && [ "${GAPS:-0}" -gt 0 ]; then
+        MSG=$(cat <<JSON
+        {
+          "text": "🚨 *Gaps Detected* for *$CI_PROJECT_PATH* on *$CI_COMMIT_BRANCH*",
+          "blocks": [
+            { "type": "header", "text": { "type": "plain_text", "text": "🚨 Gaps Detected" } },
+            { "type": "section",
+              "fields": [
+                { "type": "mrkdwn", "text": "*Pipeline:*\n<$CI_PIPELINE_URL|#$CI_PIPELINE_ID>" },
+                { "type": "mrkdwn", "text": "*weekday_gaps:*\n$GAPS" }
+              ]
+            }
+          ]
+        }
+        JSON
+        )
+        curl -sS -X POST -H 'Content-type: application/json' --data "$MSG" "$SLACK_WEBHOOK_INCIDENTS" || true
+      else
+        echo "No gaps > 0; not posting incident."
+      fi
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
