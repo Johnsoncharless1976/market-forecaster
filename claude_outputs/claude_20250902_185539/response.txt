@@ -1,0 +1,140 @@
+﻿Here is a complete, copy/paste-ready script with headers to implement the "Forecast Band Break" alert feature:
+
+File: `forecast_band_break_alert.py`
+Title: Forecast Band Break Alert
+Commit Notes: Implement intraday price band break alert with Slack notification
+
+```python
+"""
+Forecast Band Break Alert
+
+This script checks the current intraday price against the forecasted price band.
+If the price exits the band by a specified percentage, it sends a Slack alert
+with the current price, band limits, and suggested mitigation.
+
+The script is designed to be run on a regular interval (e.g. every 5 minutes)
+as part of the ZenMarket AI data processing pipeline.
+
+Prerequisites:
+- Snowflake connection via SQLAlchemy
+- Slack webhook URL for posting alerts
+
+To run:
+1. Update the config variables below with your Snowflake and Slack details
+2. Save the script in the 'scripts' folder of the ZenMarket AI repo
+3. Run the script using the following command:
+   python forecast_band_break_alert.py
+4. The script will log its actions to the 'logs' folder
+
+"""
+
+import os
+import time
+import logging
+from datetime import datetime, timedelta
+from sqlalchemy import create_engine
+import requests
+
+# Config
+SNOWFLAKE_USER = 'your_snowflake_user'
+SNOWFLAKE_PASSWORD = 'your_snowflake_password'
+SNOWFLAKE_ACCOUNT = 'your_snowflake_account'
+SNOWFLAKE_WAREHOUSE = 'your_snowflake_warehouse'
+SNOWFLAKE_DATABASE = 'your_snowflake_database'
+SNOWFLAKE_SCHEMA = 'your_snowflake_schema'
+SLACK_WEBHOOK_URL = 'your_slack_webhook_url'
+PRICE_BAND_PCT = 2  # Alert if price exits band by this percentage
+
+# Logging setup
+logging.basicConfig(
+    filename=os.path.join('logs', 'forecast_band_break_alert.log'),
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+def get_current_price():
+    """
+    Fetch the current intraday price from the Snowflake database.
+    """
+    engine = create_engine(
+        f'snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}'
+    )
+    query = """
+        SELECT last_price
+        FROM market_data
+        ORDER BY timestamp DESC
+        LIMIT 1;
+    """
+    with engine.connect() as conn:
+        result = conn.execute(query).fetchone()
+        return result[0]
+
+def get_forecast_band():
+    """
+    Fetch the current forecasted price band from the Snowflake database.
+    """
+    engine = create_engine(
+        f'snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}'
+    )
+    query = """
+        SELECT forecast_lower, forecast_upper
+        FROM price_forecast
+        ORDER BY timestamp DESC
+        LIMIT 1;
+    """
+    with engine.connect() as conn:
+        result = conn.execute(query).fetchone()
+        return result[0], result[1]
+
+def send_slack_alert(current_price, forecast_lower, forecast_upper):
+    """
+    Send a Slack alert with the current price, forecast band, and suggested mitigation.
+    """
+    message = f"""
+        *Forecast Band Break Alert*
+        
+        Current Price: ${current_price:.2f}
+        Forecast Band: ${forecast_lower:.2f} - ${forecast_upper:.2f}
+        
+        The current price has exited the forecasted price band. Suggested mitigation:
+        - Monitor the market closely for further price movements
+        - Consider adjusting trading strategies or risk management as needed
+    """
+    payload = {
+        "text": message
+    }
+    response = requests.post(SLACK_WEBHOOK_URL, json=payload)
+    if response.status_code == 200:
+        logging.info("Slack alert sent successfully.")
+    else:
+        logging.error(f"Failed to send Slack alert: {response.text}")
+
+def main():
+    """
+    Main function to check the current price against the forecast band and send an alert if necessary.
+    """
+    current_price = get_current_price()
+    forecast_lower, forecast_upper = get_forecast_band()
+
+    if current_price < forecast_lower * (1 - PRICE_BAND_PCT / 100) or \
+       current_price > forecast_upper * (1 + PRICE_BAND_PCT / 100):
+        send_slack_alert(current_price, forecast_lower, forecast_upper)
+    else:
+        logging.info("Price is within the forecast band.")
+
+if __name__ == "__main__":
+    main()
+```
+
+To run the script:
+
+1. Update the `SNOWFLAKE_*` and `SLACK_WEBHOOK_URL` variables with your own credentials and settings.
+2. Save the script in the `scripts` folder of the ZenMarket AI repository.
+3. Run the script using the following command:
+   ```
+   python forecast_band_break_alert.py
+   ```
+4. The script will log its actions to the `logs` folder.
+
+The script is designed to be run on a regular interval (e.g., every 5 minutes) as part of the ZenMarket AI data processing pipeline. It checks the current intraday price against the forecasted price band and sends a Slack alert if the price exits the band by the specified percentage (`PRICE_BAND_PCT`). The alert includes the current price, the forecast band limits, and suggested mitigation actions.

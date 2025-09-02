@@ -1,0 +1,26 @@
+﻿ROLE
+Senior engineer. Create an AM Kneeboard generator that summarizes the latest forecasts and posts to Slack + Notion Daily DB.
+
+OUTPUT (two fenced blocks only, in order)
+1) File: vscode_snowflake_starter\src\notifiers\am_kneeboard.py
+2) File: scripts\run_am_kneeboard.ps1
+
+REQUIREMENTS
+- Python 3.10+, .env (python-dotenv) ONLY:
+  SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, (SNOWFLAKE_PASSWORD or SNOWFLAKE_PRIVATE_KEY_PATH [+passphrase]),
+  SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA, SNOWFLAKE_ROLE,
+  SLACK_WEBHOOK_URL1..3 (optional), NOTION_TOKEN, NOTION_DAILY_DB_ID
+- SQLAlchemy + snowflake-sqlalchemy; build engine strictly from env (no hardcoded URIs).
+- Select latest trading day in FORECAST_DAILY (MAX(date)); join to ACTUALS_DAILY to fetch latest_close if available (LEFT JOIN is fine).
+- ATM straddle band:
+  If OPTIONS_SUMMARY(symbol,date,atm_straddle) exists for that date  band = atm_straddle.
+  Else fallback: band_pct = env BAND_PCT (default 0.02); band = forecast * band_pct.
+  Compute band_lower = forecast - band; band_upper = forecast + band.
+- Render a text table (columns: symbol, date, forecast, latest_close?, band_lower, band_upper).
+- Slack (if any SLACK_WEBHOOK_URL* present): post header \"AM Kneeboard  {YYYY-MM-DD}\" + code-block table.
+- Notion: create page in NOTION_DAILY_DB_ID with title \"AM Kneeboard  {YYYY-MM-DD}\", properties Date (date), Items (number), Note (rich text), and children blocks (paragraph + code block with table).
+- Robust stdout logs; final EXACT line: KNEEBOARD: posted_to_slack=<true|false> posted_to_notion=<true|false> rows=<n>
+- Runner (PowerShell):
+  - Ensure .venv; install python-dotenv, SQLAlchemy, snowflake-connector-python, snowflake-sqlalchemy, pandas, requests
+  - Activate venv and run am_kneeboard.py
+  - Exit non-zero on failure

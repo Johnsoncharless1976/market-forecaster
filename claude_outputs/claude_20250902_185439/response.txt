@@ -1,0 +1,97 @@
+﻿Here is the Python script for the Stage-3 Forecast Writer v1 (Baseline):
+
+```python
+# File: stage3_forecast_writer_v1.py
+# Title: Stage-3 Forecast Writer v1 (Baseline)
+# Commit Notes: Implements baseline forecast (persistence) and idempotent MERGE into FORECAST_DAILY table.
+
+import os
+import logging
+from datetime import datetime
+from sqlalchemy import create_engine, text
+
+# Configure logging
+logging.basicConfig(
+    filename='stage3_forecast_writer_v1.log',
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Snowflake connection details
+SNOWFLAKE_HOST = os.getenv('SNOWFLAKE_HOST')
+SNOWFLAKE_USER = os.getenv('SNOWFLAKE_USER')
+SNOWFLAKE_PASSWORD = os.getenv('SNOWFLAKE_PASSWORD')
+SNOWFLAKE_DATABASE = os.getenv('SNOWFLAKE_DATABASE')
+SNOWFLAKE_SCHEMA = os.getenv('SNOWFLAKE_SCHEMA')
+
+# Create Snowflake engine
+engine = create_engine(
+    f'snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_HOST}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}'
+)
+
+def run_forecast_writer():
+    """
+    Reads FEATURES_DAILY from Snowflake, computes baseline forecast (persistence),
+    and writes the results to the FORECAST_DAILY table using an idempotent MERGE.
+    """
+    try:
+        # Read FEATURES_DAILY
+        logging.info("Reading FEATURES_DAILY from Snowflake...")
+        with engine.connect() as conn:
+            features_df = conn.execute(text("SELECT * FROM FEATURES_DAILY")).fetchall()
+
+        # Compute baseline forecast (persistence)
+        logging.info("Computing baseline forecast (persistence)...")
+        forecast_df = [(row.date, row.close) for row in features_df]
+
+        # Write forecast to FORECAST_DAILY using idempotent MERGE
+        logging.info("Writing forecast to FORECAST_DAILY using idempotent MERGE...")
+        with engine.connect() as conn:
+            conn.execute(
+                text("""
+                    MERGE INTO FORECAST_DAILY AS target
+                    USING (SELECT :date AS date, :forecast AS forecast)
+                    ON target.date = :date
+                    WHEN MATCHED THEN UPDATE SET forecast = :forecast
+                    WHEN NOT MATCHED THEN INSERT (date, forecast) VALUES (:date, :forecast)
+                """),
+                [{"date": date, "forecast": forecast} for date, forecast in forecast_df]
+            )
+
+        logging.info("Forecast writing completed successfully.")
+    except Exception as e:
+        logging.error(f"Error occurred during forecast writing: {e}")
+        raise e
+
+if __name__ == "__main__":
+    run_forecast_writer()
+```
+
+To run this script, you'll need to set the following environment variables:
+
+- `SNOWFLAKE_HOST`
+- `SNOWFLAKE_USER`
+- `SNOWFLAKE_PASSWORD`
+- `SNOWFLAKE_DATABASE`
+- `SNOWFLAKE_SCHEMA`
+
+You can save the script in the `src/` directory of your repository.
+
+To run the script, you can use the following PowerShell script:
+
+```powershell
+# File: run_stage3_forecast_writer_v1.ps1
+# Title: Run Stage-3 Forecast Writer v1 (Baseline)
+# Commit Notes: Runs the Stage-3 Forecast Writer v1 (Baseline) script.
+
+$env:SNOWFLAKE_HOST = "your_snowflake_host"
+$env:SNOWFLAKE_USER = "your_snowflake_user"
+$env:SNOWFLAKE_PASSWORD = "your_snowflake_password"
+$env:SNOWFLAKE_DATABASE = "your_snowflake_database"
+$env:SNOWFLAKE_SCHEMA = "your_snowflake_schema"
+
+python src/stage3_forecast_writer_v1.py
+```
+
+Save this PowerShell script in the root directory of your repository, and run it from the command line to execute the Stage-3 Forecast Writer v1 (Baseline) script.

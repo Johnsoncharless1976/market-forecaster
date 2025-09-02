@@ -87,23 +87,20 @@ def fetch_forecast_vs_actual_data(engine: Engine, lookback_days: int = 30) -> pd
     query = text(f"""
     SELECT 
         f.SYMBOL,
-        f.TRADE_DATE as FORECAST_DATE,
-        f.PREDICTION,
-        f.PROB_UP,
-        f.PROB_DOWN,
-        f.CONFIDENCE,
+        f.FORECAST_DATE,
+        f.FORECAST as PREDICTED_CLOSE,
+        f.MODEL_VERSION,
         f.CREATED_AT as FORECAST_CREATED_AT,
         a.CLOSE as ACTUAL_CLOSE,
-        a.ADJ_CLOSE as ACTUAL_ADJ_CLOSE,
         a.RETURN_1D as ACTUAL_RETURN_1D
     FROM FORECAST_DAILY f
     INNER JOIN FEATURES_DAILY a 
         ON f.SYMBOL = a.SYMBOL 
-        AND f.TRADE_DATE = a.TRADE_DATE
-    WHERE f.TRADE_DATE >= '{cutoff_date}'
+        AND f.FORECAST_DATE = a.TRADE_DATE
+    WHERE f.FORECAST_DATE >= '{cutoff_date}'
         AND a.CLOSE IS NOT NULL
-        AND f.PREDICTION IS NOT NULL
-    ORDER BY f.SYMBOL, f.TRADE_DATE DESC
+        AND f.FORECAST IS NOT NULL
+    ORDER BY f.SYMBOL, f.FORECAST_DATE DESC
     """)
     
     logging.info(f"Fetching forecast vs actual data for last {lookback_days} days...")
@@ -113,48 +110,52 @@ def fetch_forecast_vs_actual_data(engine: Engine, lookback_days: int = 30) -> pd
     return df
 
 def calculate_forecast_metrics(df: pd.DataFrame) -> dict:
-    """Calculate forecast accuracy metrics for directional predictions."""
+    """Calculate forecast accuracy metrics for price predictions."""
     if len(df) == 0:
         return {
             'total_forecasts': 0,
-            'hit_rate_directional': 0.0,
-            'avg_confidence': 0.0,
-            'avg_prob_up': 0.0,
-            'avg_prob_down': 0.0,
+            'hit_rate_within_5pct': 0.0,
+            'mae_price': 0.0,
+            'mape_price': 0.0,
+            'rmse_price': 0.0,
             'status': 'Yellow',
             'status_reason': 'No forecast data available for audit'
         }
     
-    # Convert predictions to boolean (UP = True, DOWN = False)
-    df['predicted_up'] = df['PREDICTION'].str.upper() == 'UP'
-    df['actual_up'] = df['ACTUAL_RETURN_1D'] > 0
+    # Calculate price-based metrics
+    price_errors = np.abs(df['PREDICTED_CLOSE'] - df['ACTUAL_CLOSE'])
     
-    # Calculate directional hit rate
-    hits = df['predicted_up'] == df['actual_up']
+    # Hit rate: percentage of forecasts within 5% of actual
+    price_hit_threshold = 0.05  # 5%
+    hits = np.abs((df['PREDICTED_CLOSE'] - df['ACTUAL_CLOSE']) / df['ACTUAL_CLOSE']) <= price_hit_threshold
     hit_rate = hits.mean() * 100
     
-    # Calculate average metrics
-    avg_confidence = df['CONFIDENCE'].mean() * 100 if 'CONFIDENCE' in df.columns else 0
-    avg_prob_up = df['PROB_UP'].mean() * 100 if 'PROB_UP' in df.columns else 0
-    avg_prob_down = df['PROB_DOWN'].mean() * 100 if 'PROB_DOWN' in df.columns else 0
+    # Mean Absolute Error (MAE)
+    mae_price = price_errors.mean()
     
-    # Determine status based on hit rate
-    if hit_rate >= 60:
+    # Mean Absolute Percentage Error (MAPE)
+    mape_price = (np.abs((df['PREDICTED_CLOSE'] - df['ACTUAL_CLOSE']) / df['ACTUAL_CLOSE'])).mean() * 100
+    
+    # Root Mean Square Error (RMSE)
+    rmse_price = np.sqrt(((df['PREDICTED_CLOSE'] - df['ACTUAL_CLOSE']) ** 2).mean())
+    
+    # Determine status based on hit rate and MAPE
+    if hit_rate >= 70 and mape_price <= 10:
         status = 'Green'
-        reason = f'Directional accuracy {hit_rate:.1f}% meets performance threshold'
-    elif hit_rate >= 50:
+        reason = f'Hit rate {hit_rate:.1f}% and MAPE {mape_price:.1f}% within excellent thresholds'
+    elif hit_rate >= 50 and mape_price <= 20:
         status = 'Yellow'
-        reason = f'Directional accuracy {hit_rate:.1f}% needs improvement'
+        reason = f'Hit rate {hit_rate:.1f}% or MAPE {mape_price:.1f}% needs improvement'
     else:
         status = 'Red'
-        reason = f'Directional accuracy {hit_rate:.1f}% below acceptable threshold'
+        reason = f'Hit rate {hit_rate:.1f}% or MAPE {mape_price:.1f}% below acceptable thresholds'
     
     return {
         'total_forecasts': len(df),
-        'hit_rate_directional': hit_rate,
-        'avg_confidence': avg_confidence,
-        'avg_prob_up': avg_prob_up,
-        'avg_prob_down': avg_prob_down,
+        'hit_rate_within_5pct': hit_rate,
+        'mae_price': mae_price,
+        'mape_price': mape_price,
+        'rmse_price': rmse_price,
         'status': status,
         'status_reason': reason
     }
@@ -168,10 +169,10 @@ def create_audit_summary(metrics: dict, output_dir: Path) -> str:
     summary_data = [
         ['metric', 'value', 'status'],
         ['total_forecasts', metrics['total_forecasts'], 'INFO'],
-        ['hit_rate_directional_pct', f"{metrics['hit_rate_directional']:.2f}", 'PASS' if metrics['hit_rate_directional'] >= 50 else 'FAIL'],
-        ['avg_confidence_pct', f"{metrics['avg_confidence']:.2f}", 'INFO'],
-        ['avg_prob_up_pct', f"{metrics['avg_prob_up']:.2f}", 'INFO'],
-        ['avg_prob_down_pct', f"{metrics['avg_prob_down']:.2f}", 'INFO'],
+        ['hit_rate_within_5pct', f"{metrics['hit_rate_within_5pct']:.2f}", 'PASS' if metrics['hit_rate_within_5pct'] >= 50 else 'FAIL'],
+        ['mae_price_usd', f"{metrics['mae_price']:.2f}", 'INFO'],
+        ['mape_price_pct', f"{metrics['mape_price']:.2f}", 'PASS' if metrics['mape_price'] <= 20 else 'FAIL'],
+        ['rmse_price_usd', f"{metrics['rmse_price']:.2f}", 'INFO'],
         ['overall_status', metrics['status'], metrics['status'].upper()]
     ]
     
@@ -188,10 +189,10 @@ def create_console_report(metrics: dict) -> None:
     print("FORECAST AUDIT SUMMARY")
     print("="*60)
     print(f"Total Forecasts Evaluated: {metrics['total_forecasts']}")
-    print(f"Directional Hit Rate:      {metrics['hit_rate_directional']:.2f}%")
-    print(f"Average Confidence:        {metrics['avg_confidence']:.2f}%")
-    print(f"Average Prob Up:           {metrics['avg_prob_up']:.2f}%")
-    print(f"Average Prob Down:         {metrics['avg_prob_down']:.2f}%")
+    print(f"Hit Rate (within 5%):      {metrics['hit_rate_within_5pct']:.2f}%")
+    print(f"MAE Price:                 ${metrics['mae_price']:.2f}")
+    print(f"MAPE Price:                {metrics['mape_price']:.2f}%")
+    print(f"RMSE Price:                ${metrics['rmse_price']:.2f}")
     print()
     print(f"STATUS: {metrics['status']}")
     print(f"REASON: {metrics['status_reason']}")

@@ -1,7 +1,7 @@
 # ============================================
-# File: scripts\run_forecast.ps1
-# Title: Stage-3 Forecast Writer Runner (Production)
-# Description: Sets up Python environment and executes forecast writer with proper error handling
+# File: scripts\run_am_kneeboard.ps1
+# Title: AM Kneeboard Runner
+# Description: Sets up Python environment and executes AM kneeboard generator
 # ============================================
 
 Set-StrictMode -Version Latest
@@ -12,7 +12,7 @@ function Write-Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Write-Error($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red }
 
 try {
-    Write-Info "Starting Stage-3 Forecast Writer Runner"
+    Write-Info "Starting AM Kneeboard Runner"
     
     # Get script directory and project root
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -62,8 +62,9 @@ try {
         "python-dotenv",
         "SQLAlchemy",
         "snowflake-connector-python",
-        "snowflake-sqlalchemy", 
-        "pandas"
+        "snowflake-sqlalchemy",
+        "pandas",
+        "requests"
     )
     
     Write-Info "Installing required Python packages"
@@ -78,21 +79,28 @@ try {
     
     Write-Info "All dependencies installed successfully"
     
-    # Run the forecast writer
-    $forecastWriter = Join-Path $ProjectRoot "vscode_snowflake_starter\src\forecast\forecast_writer.py"
-    if (-not (Test-Path $forecastWriter)) {
-        Write-Error "Forecast writer not found: $forecastWriter"
+    # Create notifiers directory if it doesn't exist
+    $notifiersDir = Join-Path $ProjectRoot "vscode_snowflake_starter\src\notifiers"
+    if (-not (Test-Path $notifiersDir)) {
+        New-Item -ItemType Directory -Path $notifiersDir -Force | Out-Null
+        Write-Info "Created notifiers directory: $notifiersDir"
+    }
+    
+    # Run the AM kneeboard generator
+    $amKneeboard = Join-Path $ProjectRoot "vscode_snowflake_starter\src\notifiers\am_kneeboard.py"
+    if (-not (Test-Path $amKneeboard)) {
+        Write-Error "AM kneeboard script not found: $amKneeboard"
         exit 1
     }
     
-    Write-Info "Running forecast writer: $forecastWriter"
-    python $forecastWriter
+    Write-Info "Running AM kneeboard generator: $amKneeboard"
+    python $amKneeboard
     
     $exitCode = $LASTEXITCODE
     if ($exitCode -eq 0) {
-        Write-Info "Forecast writer completed successfully"
+        Write-Info "AM kneeboard completed successfully"
     } else {
-        Write-Error "Forecast writer failed with exit code $exitCode"
+        Write-Error "AM kneeboard failed with exit code $exitCode"
         exit $exitCode
     }
     

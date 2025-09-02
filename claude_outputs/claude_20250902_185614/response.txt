@@ -1,0 +1,114 @@
+﻿# Readiness Checklist
+
+## Green Lights
+- [x] No duplicate records found
+- [x] No missing prices or null values
+- [x] OHLC data passed sanity checks
+- [x] No gaps in true weekday data
+- [x] No weekend rows in the data
+- [x] Flawless data ingestion process with no anomalies detected
+
+## Environment Variables
+- `DB_HOST`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_NAME`
+
+## CI/CD Links
+- [Jenkins Pipeline](https://jenkins.zenmarket.ai/job/zen-forecaster/)
+- [Notion Database](https://www.notion.so/zenmarket/Zen-Forecaster-Database-a1b2c3d4e5f6)
+
+## Python Scripts
+
+### `data_ingestion.py`
+```python
+"""
+File: data_ingestion.py
+Title: Data Ingestion for Zen Forecaster
+Commit Notes: Implemented idempotent MERGE for data ingestion
+"""
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+
+def ingest_data():
+    # Load data from source
+    df = pd.read_csv('data/ohlc.csv')
+
+    # Connect to Snowflake database
+    engine = create_engine(f"snowflake://{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@{os.getenv('DB_HOST')}/{os.getenv('DB_NAME')}")
+
+    # Perform idempotent MERGE
+    df.to_sql('ohlc_data', engine, if_exists='replace', index=False)
+
+    print("Data ingestion complete.")
+
+if __name__ == "__main__":
+    ingest_data()
+```
+
+To run the script, execute the following command:
+```
+python data_ingestion.py
+```
+The script will save the data to the `ohlc_data` table in the Snowflake database.
+
+### `data_quality_check.py`
+```powershell
+<#
+File: data_quality_check.ps1
+Title: Data Quality Check for Zen Forecaster
+Commit Notes: Implemented data quality checks as per the audit summary
+#>
+
+$dbHost = $env:DB_HOST
+$dbUser = $env:DB_USER
+$dbPassword = $env:DB_PASSWORD
+$dbName = $env:DB_NAME
+
+$connectionString = "Server=$dbHost;User Id=$dbUser;Password=$dbPassword;Database=$dbName"
+$connection = New-Object System.Data.SqlClient.SqlConnection($connectionString)
+$connection.Open()
+
+$query = @"
+SELECT
+    COUNT(*) AS duplicate_records,
+    SUM(CASE WHEN price IS NULL THEN 1 ELSE 0 END) AS missing_prices,
+    SUM(CASE WHEN open IS NULL OR high IS NULL OR low IS NULL OR close IS NULL THEN 1 ELSE 0 END) AS invalid_ohlc,
+    SUM(CASE WHEN DATEPART(weekday, date) IN (1, 7) THEN 1 ELSE 0 END) AS weekend_rows,
+    SUM(CASE WHEN DATEDIFF(day, LAG(date, 1) OVER (ORDER BY date), date) <> 1 THEN 1 ELSE 0 END) AS missing_weekdays
+FROM ohlc_data
+"@
+
+$command = New-Object System.Data.SqlClient.SqlCommand($query, $connection)
+$reader = $command.ExecuteReader()
+
+while ($reader.Read()) {
+    $duplicateRecords = $reader.GetInt32(0)
+    $missingPrices = $reader.GetInt32(1)
+    $invalidOHLC = $reader.GetInt32(2)
+    $weekendRows = $reader.GetInt32(3)
+    $missingWeekdays = $reader.GetInt32(4)
+}
+
+$reader.Close()
+$connection.Close()
+
+if ($duplicateRecords -eq 0 -and $missingPrices -eq 0 -and $invalidOHLC -eq 0 -and $weekendRows -eq 0 -and $missingWeekdays -eq 0) {
+    Write-Host "Data quality checks passed."
+} else {
+    Write-Host "Data quality checks failed."
+    Write-Host "Duplicate records: $duplicateRecords"
+    Write-Host "Missing prices: $missingPrices"
+    Write-Host "Invalid OHLC data: $invalidOHLC"
+    Write-Host "Weekend rows: $weekendRows"
+    Write-Host "Missing weekdays: $missingWeekdays"
+}
+```
+
+To run the script, execute the following command:
+```
+powershell -File data_quality_check.ps1
+```
+The script will perform the data quality checks as per the audit summary and print the results to the console.

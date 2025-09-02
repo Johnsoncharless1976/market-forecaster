@@ -1,0 +1,31 @@
+﻿ROLE
+Senior engineer. Patch forecast_audit.py so it evaluates the latest date that exists in BOTH FORECAST_DAILY and ACTUALS_DAILY. If no overlap yet (e.g., forecasts are for T+1 but actuals for that date aren't published), emit Yellow with a clear reason.
+
+OUTPUT (two fenced blocks only, in order):
+1) File: vscode_snowflake_starter\src\forecast\forecast_audit.py
+2) File: scripts\run_forecast_audit.ps1
+
+REQUIREMENTS
+- Python 3.10+, dotenv, SQLAlchemy (snowflake-sqlalchemy), pandas. Build engine strictly from .env (no hardcoded URIs).
+- Determine dates:
+  - max_f = MAX(date) FROM FORECAST_DAILY
+  - max_a = MAX(date) FROM ACTUALS_DAILY
+  - eval_date = LEAST(max_f, max_a)
+- If eval_date is NULL: STATUS: Yellow - No overlapping date between forecasts and actuals yet.
+- Else audit that single eval_date:
+  - JOIN FORECAST_DAILY f and ACTUALS_DAILY a ON (symbol, date = eval_date)
+  - Compute:
+      error = a.close - f.forecast
+      mae = mean(|error|)
+      hit_band = IF env HIT_BAND_BPS set THEN hit_band = (HIT_BAND_BPS/10000.0)*a.close ELSE 0.01*a.close (1%)
+      hit_rate = share(|error| <= hit_band)
+  - Emit csv: vscode_snowflake_starter/audit_exports/forecast_audit_YYYYMMDD_HHMMSS/forecast_audit_summary.csv with rows: metric,value (mae,hit_rate,rows,eval_date)
+  - Print EXACT: STATUS: <Green|Yellow|Red> - <reason>
+    Defaults (env overrides allowed):
+      GREEN: hit_rate >= 0.80 AND mae <= 0.0100
+      YELLOW: hit_rate >= 0.70 AND mae <= 0.0200
+      RED: otherwise
+- Runner:
+  - Ensure .venv; install deps if missing; run the script
+  - Exit non-zero only on Red
+- Clear stdout INFO lines summarizing max_f, max_a, eval_date, joined rows

@@ -1,0 +1,32 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five clear facts:
+- No duplicate records were found.
+- There were no missing prices or null values.
+- OHLC (open, high, low, close) data passed sanity checks.
+- There were no gaps in true weekday data.
+- There were no weekend rows in the data.
+
+2) STATUS: Green
+The data ingestion process appears to be functioning correctly.
+
+3) Remediation Plan: None required.
+
+4) Metrics: All counts are zero, indicating no issues.
+
+5) Executive headline: Flawless data ingestion process with no anomalies detected.
+
+
+
+STATUS: n/a
+
+TASK:
+Readiness & Handoff
+Produce readiness checklist (Green/Yellow/Red lights), env vars list, CI links, Notion DB links; post to #zen-forecaster-mr.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

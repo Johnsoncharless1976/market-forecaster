@@ -1,0 +1,36 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five key facts:
+- No duplicate records detected
+- No missing prices or null values
+- OHLC data passed sanity checks
+- No gaps in true weekday data
+- No gaps in weekday or weekend data
+
+2) STATUS: Green
+The data ingestion process appears to be functioning correctly with no major issues identified.
+
+3) Remediation Plan:
+N/A - No remediation required.
+
+4) Metrics:
+- All counts are zero, indicating no gaps, duplicates, or rejections.
+- Holiday_weekdays is 0, matching true_weekday_gaps of 0.
+
+5) Executive Headline:
+The Stage-1 data ingestion process is operating as expected, with no anomalies or data quality issues identified.
+
+
+
+STATUS: n/a
+
+TASK:
+Alert: Forecast Band Break
+Add intraday watcher posting Slack alert if price exits forecast band by X%; include suggested mitigation.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

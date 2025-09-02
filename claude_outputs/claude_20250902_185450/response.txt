@@ -1,0 +1,108 @@
+﻿Here's the `forecast_audit.py` script to perform the Stage-3 Forecast Audit:
+
+```python
+"""
+File: forecast_audit.py
+Title: Stage-3 Forecast Audit
+Commit Notes: Implements forecast audit functionality to score latest forecasts against actuals.
+"""
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+from datetime import datetime
+
+# Database connection details
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASS = os.getenv("DB_PASS")
+DB_NAME = os.getenv("DB_NAME")
+
+# Output file path
+OUTPUT_FILE = "forecast_audit_summary.csv"
+
+def calculate_metrics(actuals, forecasts):
+    """
+    Calculate forecast accuracy metrics.
+    
+    Args:
+        actuals (pd.DataFrame): Actual values.
+        forecasts (pd.DataFrame): Forecast values.
+        
+    Returns:
+        dict: Forecast accuracy metrics.
+    """
+    hit_rate = (actuals == forecasts).mean()
+    mae = (actuals - forecasts).abs().mean()
+    return {"hit_rate": hit_rate, "mae": mae}
+
+def run_forecast_audit():
+    """
+    Execute the forecast audit process.
+    """
+    # Connect to the database
+    engine = create_engine(f"snowflake://{DB_USER}:{DB_PASS}@{DB_HOST}/{DB_NAME}")
+
+    # Fetch the latest actuals and forecasts
+    actuals = pd.read_sql_query("SELECT * FROM actuals ORDER BY date DESC LIMIT 1", engine)
+    forecasts = pd.read_sql_query("SELECT * FROM forecasts ORDER BY date DESC LIMIT 1", engine)
+
+    # Calculate the forecast accuracy metrics
+    metrics = calculate_metrics(actuals, forecasts)
+
+    # Determine the status based on the metrics
+    if metrics["hit_rate"] >= 0.9 and metrics["mae"] <= 5:
+        status = "Green"
+    elif metrics["hit_rate"] >= 0.8 and metrics["mae"] <= 10:
+        status = "Yellow"
+    else:
+        status = "Red"
+
+    # Create the audit summary
+    audit_summary = {
+        "timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+        "hit_rate": [metrics["hit_rate"]],
+        "mae": [metrics["mae"]],
+        "status": [status]
+    }
+    audit_df = pd.DataFrame(audit_summary)
+
+    # Save the audit summary to a CSV file
+    audit_df.to_csv(OUTPUT_FILE, index=False)
+
+    # Print the audit summary to the console
+    print(audit_df)
+
+if __name__ == "__main__":
+    run_forecast_audit()
+```
+
+To run the `forecast_audit.py` script, you'll need to set the following environment variables:
+
+- `DB_HOST`: The host URL for your Snowflake database.
+- `DB_USER`: The username for your Snowflake database.
+- `DB_PASS`: The password for your Snowflake database.
+- `DB_NAME`: The name of your Snowflake database.
+
+You can run the script using the following command:
+
+```
+python forecast_audit.py
+```
+
+The script will fetch the latest actuals and forecasts from the database, calculate the forecast accuracy metrics (hit-rate and MAE), determine the status based on the metrics, and save the audit summary to a CSV file named `forecast_audit_summary.csv` in the same directory as the script. The audit summary will also be printed to the console.
+
+The `forecast_audit_summary.csv` file will have the following structure:
+
+```
+timestamp,hit_rate,mae,status
+2023-04-18 12:34:56,0.92,4.5,Green
+```
+
+The `status` column will be one of the following values:
+
+- `Green`: The forecast accuracy is within the desired range (hit-rate >= 0.9 and MAE <= 5).
+- `Yellow`: The forecast accuracy is within the acceptable range (hit-rate >= 0.8 and MAE <= 10).
+- `Red`: The forecast accuracy is outside the acceptable range.
+
+This script is designed to be idempotent, meaning that running it multiple times will not create duplicate entries in the `forecast_audit_summary.csv` file.

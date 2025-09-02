@@ -1,0 +1,99 @@
+﻿1) File: vscode_snowflake_starter\src\forecast\forecast_audit.py
+
+```python
+import os
+from datetime import datetime
+from sqlalchemy import create_engine, text
+import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
+
+engine = create_engine(os.getenv("SNOWFLAKE_CONNECTION_STRING"))
+
+def get_max_dates():
+    with engine.connect() as conn:
+        max_f = conn.execute(text("SELECT MAX(date) AS max_f FROM FORECAST_DAILY")).scalar()
+        max_a = conn.execute(text("SELECT MAX(date) AS max_a FROM ACTUALS_DAILY")).scalar()
+    return max_f, max_a
+
+def audit_forecast(eval_date):
+    with engine.connect() as conn:
+        query = text("""
+            SELECT f.symbol, f.forecast, a.close, a.date
+            FROM FORECAST_DAILY f
+            JOIN ACTUALS_DAILY a ON (f.symbol = a.symbol AND a.date = :eval_date)
+            WHERE f.date = :eval_date
+        """)
+        df = pd.read_sql_query(query, conn, params={"eval_date": eval_date})
+
+    error = df["close"] - df["forecast"]
+    mae = abs(error).mean()
+    hit_band = max(0.01 * df["close"].mean(), 0.0001 * float(os.getenv("HIT_BAND_BPS", "100"))) 
+    hit_rate = (abs(error) <= hit_band).mean()
+
+    return {
+        "mae": mae,
+        "hit_rate": hit_rate,
+        "rows": len(df),
+        "eval_date": eval_date
+    }
+
+def main():
+    max_f, max_a = get_max_dates()
+    eval_date = min(max_f, max_a)
+
+    if eval_date is None:
+        print(f"STATUS: Yellow - No overlapping date between forecasts and actuals yet.")
+        return
+
+    audit_result = audit_forecast(eval_date)
+
+    hit_band_bps = float(os.getenv("HIT_BAND_BPS", "100"))
+    hit_band = hit_band_bps / 10000.0 * audit_result["close"].mean()
+
+    if audit_result["hit_rate"] >= 0.80 and audit_result["mae"] <= 0.0100:
+        status = "Green"
+    elif audit_result["hit_rate"] >= 0.70 and audit_result["mae"] <= 0.0200:
+        status = "Yellow"
+    else:
+        status = "Red"
+
+    print(f"STATUS: {status} - {audit_result['rows']} rows audited for {audit_result['eval_date']}")
+    print(f"MAE: {audit_result['mae']:.4f}, Hit Rate (Â±{hit_band:.2f}): {audit_result['hit_rate']:.2%}")
+
+    os.makedirs("audit_exports", exist_ok=True)
+    export_path = f"audit_exports/forecast_audit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    os.makedirs(export_path, exist_ok=True)
+    audit_result.to_csv(f"{export_path}/forecast_audit_summary.csv", index=False)
+
+if __name__ == "__main__":
+    main()
+```
+
+2) File: scripts\run_forecast_audit.ps1
+
+```powershell
+$ErrorActionPreference = "Stop"
+
+# Ensure .venv
+if (!(Test-Path ".venv")) {
+    python -m venv .venv
+    .\.venv\Scripts\activate
+    pip install -r requirements.txt
+}
+else {
+    .\.venv\Scripts\activate
+}
+
+python src\forecast\forecast_audit.py
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Forecast audit completed successfully."
+    exit 0
+}
+else {
+    Write-Host "Forecast audit failed."
+    exit 1
+}
+```

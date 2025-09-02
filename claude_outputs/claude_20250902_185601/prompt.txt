@@ -1,0 +1,35 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five Bullets:
+- No duplicates found in the data.
+- No missing data on holidays or weekends.
+- No null prices in the data.
+- OHLC (Open, High, Low, Close) data passed sanity checks.
+- No gaps in the true weekday data.
+
+STATUS: Green
+The data ingestion process has passed all audits with no issues detected.
+
+Remediation Plan: N/A
+
+Metrics:
+- All metrics are zero, indicating no gaps, duplicates, or rejections.
+- The true_weekday_gaps count is zero, which is the key indicator of complete trading day data.
+
+Executive Headline:
+The Stage-1 (Data Ingestion) audit results show a successful and complete data ingestion process with no issues identified.
+
+
+
+STATUS: Green
+
+TASK:
+Weekly Rollup
+Compile weekly rollup of audits, forecasts, post-mortems to Notion report + Slack digest.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

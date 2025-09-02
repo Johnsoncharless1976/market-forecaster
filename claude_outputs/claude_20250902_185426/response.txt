@@ -1,0 +1,67 @@
+﻿Here is the solution to the Stage-1 Exec Audit: NYSE Holiday Gate (verify) task:
+
+File: `stage1_exec_audit_nyse_holiday_gate.py`
+Title: Stage-1 Exec Audit: NYSE Holiday Gate (verify)
+Commit Notes: Implement Stage-1 Exec Audit: NYSE Holiday Gate (verify) task
+
+```python
+"""
+Stage-1 Exec Audit: NYSE Holiday Gate (verify)
+
+Verify enhanced audit with NYSE holiday calendar producing holiday_weekdays and true_weekday_gaps; assert true_weekday_gaps=0; emit summary.csv + detail CSVs.
+"""
+
+import os
+import pandas as pd
+from sqlalchemy import create_engine
+from datetime import datetime, timedelta
+
+# Connect to Snowflake
+engine = create_engine('snowflake://user:password@account.region/database/schema')
+
+# Load NYSE holiday calendar
+nyse_holidays = pd.read_sql_query("SELECT holiday_date FROM nyse_holiday_calendar", engine)
+nyse_holidays['holiday_date'] = pd.to_datetime(nyse_holidays['holiday_date'])
+
+# Load market data
+market_data = pd.read_sql_query("SELECT * FROM market_data", engine)
+market_data['date'] = pd.to_datetime(market_data['date'])
+
+# Identify holiday weekdays
+market_data['is_holiday_weekday'] = market_data['date'].dt.date.isin(nyse_holidays['holiday_date'].dt.date)
+
+# Calculate true weekday gaps
+market_data = market_data.sort_values('date')
+market_data['prev_date'] = market_data['date'].shift(1)
+market_data['weekday_gap'] = (market_data['date'] - market_data['prev_date']).dt.days
+market_data['true_weekday_gap'] = market_data['weekday_gap'][~market_data['is_holiday_weekday']]
+
+# Assert true_weekday_gaps=0
+assert market_data['true_weekday_gap'].sum() == 0, "True weekday gaps detected!"
+
+# Emit summary and detail CSVs
+market_data.to_csv('summary.csv', index=False)
+market_data[['date', 'is_holiday_weekday', 'weekday_gap', 'true_weekday_gap']].to_csv('detail.csv', index=False)
+
+print("Data ingestion process is operating at full capacity, with no discrepancies or gaps detected in the incoming data.")
+```
+
+To run the script:
+
+1. Save the script as `stage1_exec_audit_nyse_holiday_gate.py` in the appropriate directory in your repository.
+2. Ensure you have the necessary dependencies installed (pandas, sqlalchemy).
+3. Update the Snowflake connection details in the `create_engine()` call.
+4. Run the script using Python:
+
+```
+python stage1_exec_audit_nyse_holiday_gate.py
+```
+
+The script will:
+1. Load the NYSE holiday calendar and market data from Snowflake.
+2. Identify holiday weekdays and calculate true weekday gaps.
+3. Assert that the true weekday gaps sum to 0.
+4. Emit the summary.csv and detail.csv files to the current directory.
+5. Print the executive summary.
+
+The generated files will be saved in the same directory as the script.

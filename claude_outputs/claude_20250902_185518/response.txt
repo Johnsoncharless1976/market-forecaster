@@ -1,0 +1,94 @@
+﻿Here is the AM Kneeboard script with the requested information:
+
+File: `am_kneeboard.py`
+Title: "AM Kneeboard Generator"
+Commit Notes: "Implemented AM Kneeboard generation script with forecast summary and ATM straddle band."
+
+```python
+"""
+AM Kneeboard Generator
+
+This script generates the AM Kneeboard, including the forecast summary and ATM straddle band.
+The output is posted to Slack and the Notion Daily DB.
+
+How to run:
+1. Ensure you have the necessary dependencies installed (e.g., pandas, sqlalchemy, requests).
+2. Update the configuration variables (e.g., Slack webhook URL, Notion database ID) as needed.
+3. Run the script using Python: `python am_kneeboard.py`
+
+Where to save:
+Save the script in the `scripts/` directory of the ZenMarket AI repository.
+"""
+
+import pandas as pd
+from sqlalchemy import create_engine
+import requests
+
+# Configuration
+SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/YOUR_SLACK_WEBHOOK_URL"
+NOTION_DATABASE_ID = "YOUR_NOTION_DATABASE_ID"
+
+# Connect to Snowflake
+engine = create_engine("snowflake://user:password@account.region/database/schema")
+
+# Fetch forecast summary
+forecast_query = """
+SELECT symbol, forecast_mean, forecast_upper, forecast_lower
+FROM forecasts
+WHERE date = (SELECT MAX(date) FROM forecasts)
+"""
+forecast_df = pd.read_sql_query(forecast_query, engine)
+
+# Calculate ATM straddle band
+atm_query = """
+SELECT symbol, price, implied_volatility
+FROM option_data
+WHERE date = (SELECT MAX(date) FROM option_data)
+  AND strike = (SELECT price FROM underlying_data WHERE date = (SELECT MAX(date) FROM underlying_data))
+"""
+atm_df = pd.read_sql_query(atm_query, engine)
+atm_df['atm_straddle'] = 2 * atm_df['price']
+
+# Prepare Kneeboard
+kneeboard = f"""
+*AM Kneeboard*
+
+*Forecast Summary*
+{forecast_df.to_markdown(index=False)}
+
+*ATM Straddle Band*
+{atm_df.to_markdown(index=False)}
+"""
+
+# Post to Slack
+slack_payload = {
+    "text": kneeboard
+}
+requests.post(SLACK_WEBHOOK_URL, json=slack_payload)
+
+# Post to Notion
+notion_payload = {
+    "parent": {"database_id": NOTION_DATABASE_ID},
+    "properties": {
+        "Name": {"title": [{"text": {"content": "AM Kneeboard"}}]}
+    },
+    "children": [
+        {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+                "text": [{"type": "text", "text": {"content": kneeboard}}]
+            }
+        }
+    ]
+}
+requests.post("https://api.notion.com/v1/pages", headers={"Authorization": "Bearer YOUR_NOTION_API_KEY", "Content-Type": "application/json"}, json=notion_payload)
+```
+
+To run the script, save it in the `scripts/` directory of the ZenMarket AI repository and execute the following command:
+
+```
+python am_kneeboard.py
+```
+
+The script will generate the AM Kneeboard, including the forecast summary and ATM straddle band, and post it to Slack and the Notion Daily DB.

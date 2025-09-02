@@ -1,0 +1,24 @@
+﻿ROLE
+Senior engineer. Produce a production-safe baseline Forecast Writer that reads FEATURES_DAILY and MERGEs into FORECAST_DAILY using ONLY .env Snowflake settings.
+
+CONSTRAINTS
+- Overwrite these exact files:
+  1) vscode_snowflake_starter\src\forecast\forecast_writer.py
+  2) scripts\run_forecast.ps1
+- Python:
+  - Load .env (dotenv) and build SQLAlchemy engine strictly from env: SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD or SNOWFLAKE_PRIVATE_KEY_PATH(+passphrase), SNOWFLAKE_WAREHOUSE, SNOWFLAKE_DATABASE, SNOWFLAKE_SCHEMA, SNOWFLAKE_ROLE
+  - Read FEATURES_DAILY with minimally (symbol, date, close); tolerate extra columns
+  - Compute baseline persistence forecast: forecast_{t+1} = close_t per symbol
+  - CREATE TABLE IF NOT EXISTS FORECAST_DAILY (symbol STRING, date DATE, forecast FLOAT, model_version STRING, created_at TIMESTAMP_NTZ)
+  - Use a Snowflake MERGE ON (symbol, date) to upsert rows
+  - Print clear INFO lines: source rows read, symbols, forecast rows prepared, rows_upserted
+  - Final EXACT line: FORECAST: rows_upserted=<n> model_version=baseline_persistence_v1
+- Runner (PowerShell):
+  - Create .venv if missing; install python-dotenv, SQLAlchemy, snowflake-connector-python, snowflake-sqlalchemy, pandas
+  - Activate venv and run the writer
+  - Exit non-zero on failure
+
+OUTPUT FORMAT
+Return two files only, each as its own fenced block, in this order:
+1) File: vscode_snowflake_starter\src\forecast\forecast_writer.py
+2) File: scripts\run_forecast.ps1

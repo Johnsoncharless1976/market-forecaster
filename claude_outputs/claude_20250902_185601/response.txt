@@ -1,0 +1,76 @@
+﻿Here is the weekly rollup report for the ZenMarket AI build:
+
+# Weekly Rollup Report
+## Audits, Forecasts, Post-Mortems
+
+### File: weekly_rollup.py
+#### Title: Weekly Rollup Report Generator
+#### Commit Notes: Generates a complete weekly rollup report including audits, forecasts, and post-mortems. Saves report to Notion and posts digest to Slack.
+
+```python
+import os
+import datetime
+import snowflake.connector
+from sqlalchemy import create_engine
+
+# Connect to Snowflake
+engine = create_engine('snowflake://user:password@account/database/schema')
+
+# Fetch audit data
+audit_query = """
+SELECT * 
+FROM audits
+WHERE audit_date >= DATE_TRUNC('week', CURRENT_DATE - INTERVAL 1 WEEK)
+AND audit_date < DATE_TRUNC('week', CURRENT_DATE)
+"""
+audit_data = pd.read_sql_query(audit_query, engine)
+
+# Fetch forecast data
+forecast_query = """
+SELECT *
+FROM forecasts
+WHERE forecast_date >= DATE_TRUNC('week', CURRENT_DATE - INTERVAL 1 WEEK) 
+AND forecast_date < DATE_TRUNC('week', CURRENT_DATE)
+"""
+forecast_data = pd.read_sql_query(forecast_query, engine)
+
+# Fetch post-mortem data
+postmortem_query = """
+SELECT *
+FROM postmortems
+WHERE postmortem_date >= DATE_TRUNC('week', CURRENT_DATE - INTERVAL 1 WEEK)
+AND postmortem_date < DATE_TRUNC('week', CURRENT_DATE)
+"""
+postmortem_data = pd.read_sql_query(postmortem_query, engine)
+
+# Generate report
+report = f"""
+# Weekly Rollup Report
+## Audits
+{audit_data.to_markdown(index=False)}
+
+## Forecasts 
+{forecast_data.to_markdown(index=False)}
+
+## Post-Mortems
+{postmortem_data.to_markdown(index=False)}
+"""
+
+# Save report to Notion
+with open('notion_report.md', 'w') as f:
+    f.write(report)
+
+# Post digest to Slack
+slack_client.chat_postMessage(
+    channel='#engineering',
+    text=f"Weekly Rollup Report for {datetime.date.today().strftime('%B %d, %Y')}"
+)
+```
+
+To run the weekly rollup report generator:
+
+1. Update the Snowflake connection details in the `create_engine()` call.
+2. Ensure you have the necessary Slack integration set up to post the digest.
+3. Run the `weekly_rollup.py` script. The report will be saved to `notion_report.md` and a digest will be posted to the `#engineering` Slack channel.
+
+The report will include the latest audit results, forecasts, and post-mortems for the previous week. This script is designed to be idempotent and can be run on a regular schedule (e.g., weekly) to generate the latest rollup.

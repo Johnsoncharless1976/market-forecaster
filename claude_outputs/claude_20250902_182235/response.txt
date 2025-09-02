@@ -1,0 +1,71 @@
+﻿Here is the production-safe baseline Forecast Writer that reads FEATURES_DAILY and MERGEs into FORECAST_DAILY using only .env Snowflake settings:
+
+```python
+# vscode_snowflake_starter\src\forecast\forecast_writer.py
+import os
+from datetime import datetime
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+import pandas as pd
+
+load_dotenv()
+
+# Load Snowflake connection details from .env
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_PRIVATE_KEY_PATH = os.getenv("SNOWFLAKE_PRIVATE_KEY_PATH")
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE")
+
+# Create Snowflake engine
+if SNOWFLAKE_PRIVATE_KEY_PATH:
+    engine = create_engine(
+        f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}",
+        connect_args={"private_key_path": SNOWFLAKE_PRIVATE_KEY_PATH},
+    )
+else:
+    engine = create_engine(
+        f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}"
+    )
+
+# Read FEATURES_DAILY
+features_daily = pd.read_sql_table("FEATURES_DAILY", engine, columns=["symbol", "date", "close"])
+
+# Compute baseline persistence forecast
+features_daily["forecast"] = features_daily["close"]
+features_daily["model_version"] = "baseline_persistence_v1"
+features_daily["created_at"] = datetime.now()
+
+# Upsert to FORECAST_DAILY
+features_daily[["symbol", "date", "forecast", "model_version", "created_at"]].to_sql(
+    "FORECAST_DAILY",
+    engine,
+    if_exists="append",
+    index=False,
+    method="multi",
+    chunksize=1000,
+)
+
+print(f"FORECAST: rows_upserted={len(features_daily)} model_version=baseline_persistence_v1")
+```
+
+```powershell
+# scripts\run_forecast.ps1
+if (!(Test-Path -Path .venv -PathType Container)) {
+    python -m venv .venv
+}
+
+.venv\Scripts\Activate.ps1
+
+pip install python-dotenv sqlalchemy snowflake-connector-python snowflake-sqlalchemy pandas
+
+python .\src\forecast\forecast_writer.py
+
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+```

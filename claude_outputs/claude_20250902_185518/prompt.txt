@@ -1,0 +1,39 @@
+﻿ROLE: Senior engineer continuing ZenMarket AI build.
+CONTEXT:
+Latest audit summary (verbatim):
+
+1) Five key facts:
+- No duplicates, null prices, or weekend rows detected in the data.
+- There were no gaps in true weekday data.
+- However, there were 0 holiday weekdays identified, indicating potential missing data.
+- Weekday gaps were also 0, suggesting no missing trading day data.
+- OHLC (Open, High, Low, Close) data passed sanity checks.
+
+2) STATUS: Yellow
+Reason: Potential missing holiday weekday data.
+
+3) Remediation Plan:
+1. Investigate the holiday calendar used and ensure it is comprehensive.
+2. Implement a process to cross-check the data ingestion against the expected trading calendar.
+3. Establish automated alerts for any missing or unexpected trading days.
+4. Review the data ingestion pipeline to identify potential points of failure.
+5. Implement robust data quality checks throughout the ingestion process.
+
+4) Metrics:
+- No non-zero gap/duplicate/reject counts.
+- holiday_weekdays = 0, true_weekday_gaps = 0.
+
+5) Executive Headline: Potential missing holiday data identified in Stage-1 audit, requiring investigation and process improvements to ensure comprehensive data ingestion.
+
+
+
+STATUS: n/a
+
+TASK:
+Notifier: AM Kneeboard
+Generate AM kneeboard (forecast summary, ATM straddle band) and post to Slack + Notion Daily DB.
+
+CONSTRAINTS:
+Produce complete, copy/paste-ready scripts with headers (File, Title, Commit Notes).
+No placeholders. Include how to run and where to save files in repo.
+Prefer Python + PowerShell for runners; Snowflake via SQLAlchemy; idempotent MERGE; clear logs.

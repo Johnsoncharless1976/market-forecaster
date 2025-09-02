@@ -1,7 +1,7 @@
 # ============================================
-# File: scripts\run_forecast.ps1
-# Title: Stage-3 Forecast Writer Runner (Production)
-# Description: Sets up Python environment and executes forecast writer with proper error handling
+# File: scripts\run_intraday_band_alert.ps1
+# Title: Intraday Band Alert Runner
+# Description: Sets up Python environment and executes intraday band alert system
 # ============================================
 
 Set-StrictMode -Version Latest
@@ -12,7 +12,7 @@ function Write-Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Write-Error($msg) { Write-Host "[ERROR] $msg" -ForegroundColor Red }
 
 try {
-    Write-Info "Starting Stage-3 Forecast Writer Runner"
+    Write-Info "Starting Intraday Band Alert Runner"
     
     # Get script directory and project root
     $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -62,8 +62,9 @@ try {
         "python-dotenv",
         "SQLAlchemy",
         "snowflake-connector-python",
-        "snowflake-sqlalchemy", 
-        "pandas"
+        "snowflake-sqlalchemy",
+        "pandas",
+        "requests"
     )
     
     Write-Info "Installing required Python packages"
@@ -78,21 +79,31 @@ try {
     
     Write-Info "All dependencies installed successfully"
     
-    # Run the forecast writer
-    $forecastWriter = Join-Path $ProjectRoot "vscode_snowflake_starter\src\forecast\forecast_writer.py"
-    if (-not (Test-Path $forecastWriter)) {
-        Write-Error "Forecast writer not found: $forecastWriter"
+    # Create notifiers directory if it doesn't exist
+    $notifiersDir = Join-Path $ProjectRoot "vscode_snowflake_starter\src\notifiers"
+    if (-not (Test-Path $notifiersDir)) {
+        New-Item -ItemType Directory -Path $notifiersDir -Force | Out-Null
+        Write-Info "Created notifiers directory: $notifiersDir"
+    }
+    
+    # Run the intraday band alert
+    $intradayAlert = Join-Path $ProjectRoot "vscode_snowflake_starter\src\notifiers\intraday_band_alert.py"
+    if (-not (Test-Path $intradayAlert)) {
+        Write-Error "Intraday band alert script not found: $intradayAlert"
         exit 1
     }
     
-    Write-Info "Running forecast writer: $forecastWriter"
-    python $forecastWriter
+    Write-Info "Running intraday band alert: $intradayAlert"
+    python $intradayAlert
     
     $exitCode = $LASTEXITCODE
     if ($exitCode -eq 0) {
-        Write-Info "Forecast writer completed successfully"
+        Write-Info "Intraday band alert completed successfully"
+    } elseif ($exitCode -eq 1) {
+        Write-Error "Intraday band alert detected breaches with no notification system configured"
+        exit $exitCode
     } else {
-        Write-Error "Forecast writer failed with exit code $exitCode"
+        Write-Error "Intraday band alert failed with exit code $exitCode"
         exit $exitCode
     }
     

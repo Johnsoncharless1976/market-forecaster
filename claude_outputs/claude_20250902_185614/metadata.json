@@ -1,0 +1,8 @@
+﻿{
+    "response_chars":  3439,
+    "timestamp":  "20250902_185614",
+    "max_tokens":  1800,
+    "temperature":  0.2,
+    "model":  "claude-3-haiku-20240307",
+    "prompt_chars":  1036
+}

@@ -1,0 +1,150 @@
+﻿1) File: vscode_snowflake_starter\src\notifiers\am_kneeboard.py
+
+```python
+import os
+import logging
+from datetime import datetime
+from typing import Optional, Tuple
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text
+import pandas as pd
+import requests
+
+load_dotenv()
+
+SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT")
+SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER")
+SNOWFLAKE_PASSWORD = os.getenv("SNOWFLAKE_PASSWORD")
+SNOWFLAKE_PRIVATE_KEY_PATH = os.getenv("SNOWFLAKE_PRIVATE_KEY_PATH")
+SNOWFLAKE_PRIVATE_KEY_PASSPHRASE = os.getenv("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE")
+SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE")
+SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE")
+SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA")
+SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE")
+
+SLACK_WEBHOOK_URL1 = os.getenv("SLACK_WEBHOOK_URL1")
+SLACK_WEBHOOK_URL2 = os.getenv("SLACK_WEBHOOK_URL2")
+SLACK_WEBHOOK_URL3 = os.getenv("SLACK_WEBHOOK_URL3")
+
+NOTION_TOKEN = os.getenv("NOTION_TOKEN")
+NOTION_DAILY_DB_ID = os.getenv("NOTION_DAILY_DB_ID")
+
+BAND_PCT = float(os.getenv("BAND_PCT", "0.02"))
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+
+def get_snowflake_engine():
+    if SNOWFLAKE_PASSWORD:
+        return create_engine(
+            f"snowflake://{SNOWFLAKE_USER}:{SNOWFLAKE_PASSWORD}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}"
+        )
+    else:
+        return create_engine(
+            f"snowflake://{SNOWFLAKE_USER}@{SNOWFLAKE_ACCOUNT}/{SNOWFLAKE_DATABASE}/{SNOWFLAKE_SCHEMA}?warehouse={SNOWFLAKE_WAREHOUSE}&role={SNOWFLAKE_ROLE}&private_key_file={SNOWFLAKE_PRIVATE_KEY_PATH}&private_key_passphrase={SNOWFLAKE_PRIVATE_KEY_PASSPHRASE}"
+        )
+
+def get_latest_trading_day() -> datetime:
+    engine = get_snowflake_engine()
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT MAX(date) AS latest_date FROM FORECAST_DAILY")).fetchone()
+        return result[0]
+
+def get_kneeboard_data(latest_date: datetime) -> pd.DataFrame:
+    engine = get_snowflake_engine()
+    with engine.connect() as conn:
+        query = f"""
+            SELECT
+                f.symbol,
+                f.date,
+                f.forecast,
+                a.latest_close,
+                CASE
+                    WHEN o.atm_straddle IS NOT NULL THEN o.atm_straddle
+                    ELSE f.forecast * {BAND_PCT}
+                END AS band,
+                f.forecast - CASE
+                    WHEN o.atm_straddle IS NOT NULL THEN o.atm_straddle
+                    ELSE f.forecast * {BAND_PCT}
+                END AS band_lower,
+                f.forecast + CASE
+                    WHEN o.atm_straddle IS NOT NULL THEN o.atm_straddle
+                    ELSE f.forecast * {BAND_PCT}
+                END AS band_upper
+            FROM FORECAST_DAILY f
+            LEFT JOIN ACTUALS_DAILY a ON f.symbol = a.symbol AND f.date = a.date
+            LEFT JOIN OPTIONS_SUMMARY o ON f.symbol = o.symbol AND f.date = o.date
+            WHERE f.date = :latest_date
+        """
+        return pd.read_sql_query(query, conn, params={"latest_date": latest_date})
+
+def post_to_slack(table: str, latest_date: datetime) -> bool:
+    if not any([SLACK_WEBHOOK_URL1, SLACK_WEBHOOK_URL2, SLACK_WEBHOOK_URL3]):
+        return False
+
+    payload = {
+        "text": f"AM Kneeboard {latest_date.strftime('%Y-%m-%d')}",
+        "blocks": [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"```{table}```"
+                }
+            }
+        ]
+    }
+
+    for url in [SLACK_WEBHOOK_URL1, SLACK_WEBHOOK_URL2, SLACK_WEBHOOK_URL3]:
+        if url:
+            response = requests.post(url, json=payload)
+            response.raise_for_status()
+
+    return True
+
+def post_to_notion(table: str, latest_date: datetime) -> bool:
+    if not NOTION_TOKEN or not NOTION_DAILY_DB_ID:
+        return False
+
+    url = f"https://api.notion.com/v1/pages"
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28"
+    }
+
+    payload = {
+        "parent": {"database_id": NOTION_DAILY_DB_ID},
+        "properties": {
+            "Date": {"date": {"start": latest_date.strftime("%Y-%m-%d")}},
+            "Items": {"number": len(table.split("\n")) - 1},
+            "Note": {"rich_text": [{"text": {"content": table}}]}
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+    return True
+
+def run_am_kneeboard():
+    latest_date = get_latest_trading_day()
+    logging.info(f"Latest trading day: {latest_date}")
+
+    df = get_kneeboard_data(latest_date)
+    table = df.to_string(index=False)
+    logging.info(f"AM Kneeboard data:\n{table}")
+
+    posted_to_slack = post_to_slack(table, latest_date)
+    posted_to_notion = post_to_notion(table, latest_date)
+
+    logging.info(f"KNEEBOARD: posted_to_slack={posted_to_slack} posted_to_notion={posted_to_notion} rows={len(df)}")
+
+if __name__ == "__main__":
+    run_am_kneeboard()
+```
+
+2) File: scripts\run_am_kneeboard.ps1
+
+```powershell
+$ErrorActionPreference = "Stop"
+
+# Ensure .v
