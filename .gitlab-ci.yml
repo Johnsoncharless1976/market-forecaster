@@ -21,6 +21,9 @@ default:
 
 stages: [exec, reports]
 
+# -------------------
+# Stage: exec (audit)
+# -------------------
 audit_cli:
   stage: exec
   script:
@@ -43,8 +46,8 @@ audit_cli:
   artifacts:
     when: always
     paths:
-      - "$AUDIT_DIR/REPORT_EXEC.md"
-      - "$AUDIT_DIR/summary.csv"
+      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/REPORT_EXEC.md"
+      - "vscode_snowflake_starter/audit_exports/stage1_exec_*/summary.csv"
     reports:
       dotenv: exec.env
     expire_in: 1 week
@@ -52,9 +55,11 @@ audit_cli:
     - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
+# ----------------------
+# Stage: reports (print)
+# ----------------------
 publish_exec_report:
   stage: reports
-  needs: ["audit_cli"]
   script:
     - echo "EXEC_READY=${EXEC_READY}"
     - test "${EXEC_READY}" = "true"
@@ -64,7 +69,6 @@ publish_exec_report:
     - head -50 "${AUDIT_DIR}/REPORT_EXEC.md"
     - echo "===== summary.csv (tail) ====="
     - tail -20 "${AUDIT_DIR}/summary.csv"
-  dependencies: ["audit_cli"]
   artifacts:
     when: always
     paths:
@@ -74,86 +78,66 @@ publish_exec_report:
     - if: '$CI_COMMIT_BRANCH == "perf/chopguard-v0.2.1"'
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
-# -----------------------------
-# Slack notifications (webhooks)
-# -----------------------------
+# ---------------------------------------------
+# Stage: reports (Slack notifications, webhooks)
+# ---------------------------------------------
 # Requirements:
-#   - CI/CD variables:
+#   - Set masked CI/CD variables:
 #       SLACK_WEBHOOK_MR            -> webhook for #zen-forecaster-mr
 #       SLACK_WEBHOOK_INCIDENTS     -> webhook for #zen-forecaster-incidents
-#   - No Claude, no bot token; plain webhooks via Python stdlib
 
 slack_mr_update:
   stage: reports
-  needs: ["audit_cli"]
   rules:
     # Post to MR channel for any MR-triggered pipeline (pass/fail)
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
   script:
     - |
-      python - <<'PY'
-      import json, os, urllib.request
-      hook = os.environ.get("SLACK_WEBHOOK_MR")
-      if not hook:
-          raise SystemExit("SLACK_WEBHOOK_MR not set")
-      title = os.environ.get("CI_MERGE_REQUEST_TITLE","(no title)")
-      iid   = os.environ.get("CI_MERGE_REQUEST_IID","?")
-      proj  = os.environ.get("CI_PROJECT_PATH","")
-      mrurl = os.environ.get("CI_MERGE_REQUEST_PROJECT_URL","") + f"/-/merge_requests/{iid}"
-      purl  = os.environ.get("CI_PIPELINE_URL","")
-      pid   = os.environ.get("CI_PIPELINE_ID","")
-      status= os.environ.get("CI_PIPELINE_STATUS","")
-      text  = f"*MR:* <{mrurl}|!{iid}> • *{title}*\n*Pipeline:* <{purl}|#{pid}> • *Status:* {status}"
-      payload = {"text":"MR Update","blocks":[{"type":"section","text":{"type":"mrkdwn","text":text}}]}
-      req = urllib.request.Request(hook, data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
-      with urllib.request.urlopen(req) as r: r.read()
-      print("Posted MR update")
-      PY
+      MSG=$(cat <<JSON
+      {
+        "text": "*MR Update*",
+        "blocks": [
+          {
+            "type": "section",
+            "text": { "type": "mrkdwn",
+              "text": "*MR:* <$CI_MERGE_REQUEST_PROJECT_URL/-/merge_requests/$CI_MERGE_REQUEST_IID|!$CI_MERGE_REQUEST_IID> • *$CI_MERGE_REQUEST_TITLE*\n*Pipeline:* <$CI_PIPELINE_URL|#$CI_PIPELINE_ID> • *Status:* $CI_PIPELINE_STATUS"
+            }
+          }
+        ]
+      }
+      JSON
+      )
+      test -n "$SLACK_WEBHOOK_MR" || { echo "SLACK_WEBHOOK_MR not set"; exit 0; }
+      curl -sS -X POST -H 'Content-type: application/json' --data "$MSG" "$SLACK_WEBHOOK_MR" || true
 
 slack_incident_on_fail:
   stage: reports
-  needs: ["audit_cli","publish_exec_report"]
   when: always
   rules:
-    # Fire only on failed pipelines
+    # Fire only on failed pipelines (even if exec job failed)
     - if: '$CI_PIPELINE_STATUS == "failed"'
       when: always
   script:
     - |
-      python - <<'PY'
-      import os, json, urllib.request, pathlib, csv
-      hook = os.environ.get("SLACK_WEBHOOK_INCIDENTS")
-      if not hook:
-          raise SystemExit("SLACK_WEBHOOK_INCIDENTS not set")
-      proj  = os.environ.get("CI_PROJECT_PATH","")
-      branch= os.environ.get("CI_COMMIT_BRANCH","")
-      purl  = os.environ.get("CI_PIPELINE_URL","")
-      pid   = os.environ.get("CI_PIPELINE_ID","")
-      sha   = os.environ.get("CI_COMMIT_SHA","")
-      short = os.environ.get("CI_COMMIT_SHORT_SHA", sha[:8])
-      # Try to include weekday_gaps from latest summary.csv
-      gaps="n/a"
-      audit_dir = os.environ.get("AUDIT_DIR","")
-      if audit_dir:
-          try:
-              with open(str(pathlib.Path(audit_dir)/"summary.csv"), newline="") as f:
-                  for row in csv.DictReader(f):
-                      if row.get("check")=="weekday_gaps":
-                          gaps = row.get("violations","n/a")
-                          break
-          except Exception:
-              pass
-      text = (
-          f"🚨 *Pipeline FAILED*\n"
-          f"*Project:* {proj}\n*Branch:* {branch}\n"
-          f"<{purl}|Pipeline #{pid}> • <{os.environ.get('CI_PROJECT_URL')}/-/commit/{sha}|{short}>\n"
-          f"*weekday_gaps:* {gaps}"
+      AUD="vscode_snowflake_starter/audit_exports"
+      LAST_DIR=$(ls -dt ${AUD}/stage1_exec_* 2>/dev/null | head -1 || true)
+      LAST_SUM="${LAST_DIR:+$LAST_DIR/summary.csv}"
+      GAPS=$([ -f "$LAST_SUM" ] && awk -F, '$1=="weekday_gaps"{print $2}' "$LAST_SUM" || echo "n/a")
+      MSG=$(cat <<JSON
+      {
+        "text": "🚨 *Pipeline FAILED* for *$CI_PROJECT_PATH* on *$CI_COMMIT_BRANCH*",
+        "blocks": [
+          { "type": "header", "text": { "type": "plain_text", "text": "🚨 Pipeline Failed" } },
+          { "type": "section",
+            "fields": [
+              { "type": "mrkdwn", "text": "*Pipeline:*\n<$CI_PIPELINE_URL|#$CI_PIPELINE_ID>" },
+              { "type": "mrkdwn", "text": "*Commit:*\n<$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|${CI_COMMIT_SHORT_SHA:-$CI_COMMIT_SHA}>" },
+              { "type": "mrkdwn", "text": "*weekday_gaps:*\n$GAPS" }
+            ]
+          }
+        ]
+      }
+      JSON
       )
-      payload = {"text":"PIPELINE FAILED","blocks":[
-          {"type":"header","text":{"type":"plain_text","text":"🚨 Pipeline Failed"}},
-          {"type":"section","text":{"type":"mrkdwn","text":text}}
-      ]}
-      req = urllib.request.Request(hook, data=json.dumps(payload).encode(), headers={"Content-Type":"application/json"})
-      with urllib.request.urlopen(req) as r: r.read()
-      print("Posted incident alert")
-      PY
+      test -n "$SLACK_WEBHOOK_INCIDENTS" || { echo "SLACK_WEBHOOK_INCIDENTS not set"; exit 0; }
+      curl -sS -X POST -H 'Content-type: application/json' --data "$MSG" "$SLACK_WEBHOOK_INCIDENTS" || true
