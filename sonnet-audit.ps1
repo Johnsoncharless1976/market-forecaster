@@ -19,6 +19,10 @@ function Load-DotEnv([string]$Path) {
         Write-Warn ".env not found at: $Path"
         return
     }
+    
+    # Clear any existing SLACK_WEBHOOK_URL* variables first
+    Remove-Item env:SLACK_WEBHOOK_URL* -ErrorAction SilentlyContinue
+    
     Get-Content -LiteralPath $Path | ForEach-Object {
         $line = $_.Trim()
         if ($line -eq "" -or $line.StartsWith("#")) { return }
