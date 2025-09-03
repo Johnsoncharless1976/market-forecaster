@@ -1,0 +1,985 @@
+[
+  {
+    "name": "fed_news",
+    "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 20,
+      "title": "FRB: Press Release - All Releases",
+      "description": "All recent press releases from the Federal Reserve Board",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 7.8,
+      "high_impact_articles": 12,
+      "category_distribution": {
+        "MONETARY_POLICY": 16,
+        "BANKING": 8,
+        "GENERAL_MARKET": 4,
+        "MARKET_STRUCTURE": 1,
+        "TECH_DISRUPTION": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Federal Reserve Board announces it will host a conference on payments innovation on Tuesday, October 21",
+          "description": "Federal Reserve Board announces it will host a conference on payments innovation on Tuesday, October 21",
+          "published": "Wed, 3 Sep 2025 15:00:00 GMT",
+          "impact_score": 10,
+          "categories": [
+            "MONETARY_POLICY"
+          ]
+        },
+        {
+          "title": "Federal Reserve Board announces final individual capital requirements for large banks, effective on October 1",
+          "description": "Federal Reserve Board announces final individual capital requirements for large banks, effective on October 1",
+          "published": "Fri, 29 Aug 2025 20:00:00 GMT",
+          "impact_score": 10,
+          "categories": [
+            "MONETARY_POLICY",
+            "BANKING"
+          ]
+        },
+        {
+          "title": "Minutes of the Board's discount rate meetings on July 21 and July 30, 2025",
+          "description": "Minutes of the Board's discount rate meetings on July 21 and July 30, 2025",
+          "published": "Tue, 26 Aug 2025 18:00:00 GMT",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "cnbc_economy",
+    "url": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 30,
+      "title": "Economy",
+      "description": "Find the latest economic news, current events and headlines, as well as blogs and video from CNBC.com.",
+      "last_updated": "Wed, 03 Sep 2025 16:31 GMT"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 7.3,
+      "high_impact_articles": 11,
+      "category_distribution": {
+        "GENERAL_MARKET": 5,
+        "MACRO_DATA": 6,
+        "TECH_DISRUPTION": 8,
+        "GEOPOLITICAL": 1,
+        "MONETARY_POLICY": 3,
+        "MARKET_STRUCTURE": 2,
+        "TRADE": 3,
+        "BANKING": 2
+      },
+      "sample_articles": [
+        {
+          "title": "Job opening data falls to levels rarely seen since pandemic",
+          "description": "The Job Openings and Labor Turnover report showed less than 7.2 million listings in July.",
+          "published": "Wed, 03 Sep 2025 14:57:19 GMT",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Euro zone inflation rises to hotter-than-expected 2.1% in August",
+          "description": "Economists polled by Reuters had expected the rate to remain unchanged from July, at 2%.",
+          "published": "Tue, 02 Sep 2025 09:34:51 GMT",
+          "impact_score": 8,
+          "categories": [
+            "MACRO_DATA",
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Trump keeps threatening to punish Putin. Here's what's holding him back",
+          "description": "U.S. President Donald Trump says he'll punish Russia if Moscow doesn't agree to peace talks with Ukraine. Yet, he hasn't pushed the button, so far.",
+          "published": "Mon, 01 Sep 2025 21:08:58 GMT",
+          "impact_score": 0,
+          "categories": [
+            "GEOPOLITICAL",
+            "TECH_DISRUPTION"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "seeking_alpha",
+    "url": "https://seekingalpha.com/market_currents.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 7,
+      "title": "Breaking News on Seeking Alpha",
+      "description": "\u00a9 seekingalpha.com. Use of this feed is limited to personal, non-commercial use and is governed by Seeking Alpha's Terms of Use (https://about.seekingalpha.com/terms). Publishing this feed for public or commercial use and/or misrepresentation by a third party is prohibited.",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 7,
+      "avg_impact_score": 6.29,
+      "high_impact_articles": 4,
+      "category_distribution": {
+        "GENERAL_MARKET": 4,
+        "TRADE": 1,
+        "TECH_DISRUPTION": 2,
+        "GEOPOLITICAL": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Erasca, Candle, Xencor drop as BofA downgrades on lack of near-term catalysts",
+          "description": "",
+          "published": "Wed, 03 Sep 2025 15:14:48 -0400",
+          "impact_score": 8,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "BCA Research\u2019s Marko Papic: If tariffs deemed illegal, the bond market needs to reconsider its OBBBA approach",
+          "description": "",
+          "published": "Wed, 03 Sep 2025 15:09:07 -0400",
+          "impact_score": 10,
+          "categories": [
+            "TRADE"
+          ]
+        },
+        {
+          "title": "Docusign Q2 Preview: Analysts expect mixed-bag earnings, IAM in focus",
+          "description": "",
+          "published": "Wed, 03 Sep 2025 15:00:12 -0400",
+          "impact_score": 8,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "marketwatch_breaking",
+    "url": "http://feeds.marketwatch.com/marketwatch/realtimeheadlines/",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 10,
+      "title": "MarketWatch.com - Real-time Headlines",
+      "description": "MarketWatch, a leading publisher of business and financial news, offers users up-to-the minute news, investment tools, and subscription products.",
+      "last_updated": "Wed, 03 Sep 2025 19:23:06 GMT"
+    },
+    "analysis": {
+      "total_articles": 10,
+      "avg_impact_score": 2.6,
+      "high_impact_articles": 2,
+      "category_distribution": {
+        "GENERAL_MARKET": 6,
+        "BANKING": 2,
+        "MONETARY_POLICY": 3,
+        "MACRO_DATA": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Elon Musk in a post on X says some of his Trump posts \u2018went too far\u2019 and that he regrets them",
+          "description": "",
+          "published": "Wed, 11 Jun 2025 07:09:00 GMT",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Bank of England decision on Thursday will be at 12:02 p.m. local time instead of 12 p.m., due to VE Day\u2019s two minutes of silence",
+          "description": "",
+          "published": "Tue, 06 May 2025 11:59:00 GMT",
+          "impact_score": 0,
+          "categories": [
+            "BANKING"
+          ]
+        },
+        {
+          "title": "Swiss National Bank cuts interest rates by a half point to 0.5%",
+          "description": "",
+          "published": "Thu, 12 Dec 2024 08:32:00 GMT",
+          "impact_score": 10,
+          "categories": [
+            "MONETARY_POLICY",
+            "BANKING"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "wsj_markets",
+    "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 20,
+      "title": "WSJ.com: Markets",
+      "description": "Markets",
+      "last_updated": "Mon, 27 Jan 2025 14:27:15 -0500"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 4.8,
+      "high_impact_articles": 7,
+      "category_distribution": {
+        "GEOPOLITICAL": 7,
+        "TECH_DISRUPTION": 9,
+        "GENERAL_MARKET": 4,
+        "TRADE": 1,
+        "ENERGY": 3,
+        "MONETARY_POLICY": 1,
+        "NATURAL_DISASTERS": 1,
+        "BANKING": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Stocks Sink in Broad AI Rout Sparked by China's DeepSeek",
+          "description": "U.S. stocks were mostly lower, with the Nasdaq leading declines as makers of AI infrastructure suffered steep falls, many in the double digits. Nvidia was down 16%.",
+          "published": "Mon, 27 Jan 2025 14:26:00 -0500",
+          "impact_score": 8,
+          "categories": [
+            "GEOPOLITICAL",
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Comex Gold, Silver Settle Lower",
+          "description": "Gold settled 1.4% lower, down two of the past three sessions, and silver fell 2.5%, down three of the past four sessions.",
+          "published": "Mon, 27 Jan 2025 14:01:00 -0500",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "DeepSeek Won't Sink U.S. AI Titans",
+          "description": "Panic fueling the selloff of Nvidia, Broadcom and other tech giants is overblown.",
+          "published": "Mon, 27 Jan 2025 13:12:00 -0500",
+          "impact_score": 0,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "reuters_business",
+    "url": "http://feeds.reuters.com/reuters/businessNews",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "bloomberg_economics",
+    "url": "https://feeds.bloomberg.com/economics/news.rss",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 30,
+      "title": "Bloomberg Economics",
+      "description": "Bloomberg Economics",
+      "last_updated": "Wed, 03 Sep 2025 19:23:55 GMT"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 13.7,
+      "high_impact_articles": 14,
+      "category_distribution": {
+        "MONETARY_POLICY": 9,
+        "TECH_DISRUPTION": 14,
+        "BANKING": 10,
+        "TRADE": 2,
+        "MARKET_STRUCTURE": 3,
+        "MACRO_DATA": 4,
+        "GEOPOLITICAL": 4
+      },
+      "sample_articles": [
+        {
+          "title": "Fed\u2019s Beige Book Shows Little or No Growth Across Most of US",
+          "description": "US economic activity saw \u201clittle or no change\u201d across most of the country in recent weeks, the Federal Reserve said in its Beige Book survey of regional business contacts.",
+          "published": "Wed, 03 Sep 2025 18:08:47 GMT",
+          "impact_score": 12,
+          "categories": [
+            "MONETARY_POLICY",
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Trump\u2019s Drive to Reshape the Fed Progresses With Rapid Senate Hearing",
+          "description": "President Donald Trump\u2019s campaign to reshape the Federal Reserve gains ground on Thursday with an accelerated Senate confirmation hearing on his nomination of a close adviser to be a governor of the c",
+          "published": "Wed, 03 Sep 2025 10:00:00 GMT",
+          "impact_score": 10,
+          "categories": [
+            "MONETARY_POLICY",
+            "BANKING",
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Carney Sends Envoys to DC After \u2018Constructive\u2019 Trump Call",
+          "description": "Mark Carney said Canada and the US are in negotiations to resolve issues in tariff-affected sectors after a \u201cvery constructive\u201d conversation with President Donald Trump on Monday evening.",
+          "published": "Wed, 03 Sep 2025 16:28:03 GMT",
+          "impact_score": 8,
+          "categories": [
+            "TRADE",
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "financial_times",
+    "url": "https://www.ft.com/rss/home/us",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 0,
+      "title": "Unknown",
+      "description": "",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 0,
+      "avg_impact_score": 0,
+      "high_impact_articles": 0,
+      "category_distribution": {},
+      "sample_articles": []
+    }
+  },
+  {
+    "name": "zerohedge",
+    "url": "https://feeds.feedburner.com/zerohedge/feed",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 25,
+      "title": "ZeroHedge News",
+      "description": "",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 26.1,
+      "high_impact_articles": 19,
+      "category_distribution": {
+        "MONETARY_POLICY": 15,
+        "CORPORATE_CRISIS": 6,
+        "BANKING": 7,
+        "TECH_DISRUPTION": 20,
+        "MARKET_STRUCTURE": 16,
+        "GEOPOLITICAL": 15,
+        "ENERGY": 6,
+        "NATURAL_DISASTERS": 3,
+        "MACRO_DATA": 7,
+        "TRADE": 6
+      },
+      "sample_articles": [
+        {
+          "title": "Polymarket Cleared For US Adoption After CFTC Ruling, CEO Says",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\">Polymarket Cleared For US Adoption After CFTC Ruling, CEO Says</span>\n\n            <div class=\"clearfix text-formatted fiel",
+          "published": "Wed, 03 Sep 2025 17:40:00 +0000",
+          "impact_score": 12,
+          "categories": [
+            "MONETARY_POLICY",
+            "CORPORATE_CRISIS",
+            "BANKING",
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "IAEA Discovers Traces Of Depleted Uranium At Syrian Sites Bombed By Israel",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\">IAEA Discovers Traces Of Depleted Uranium At Syrian Sites Bombed By Israel</span>\n\n            <div class=\"clearfix text-fo",
+          "published": "Wed, 03 Sep 2025 17:20:00 +0000",
+          "impact_score": 28,
+          "categories": [
+            "GEOPOLITICAL",
+            "CORPORATE_CRISIS",
+            "ENERGY",
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "Sick Leftist Audience Boos When Colbert Tells Them Trump Is Alive",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\">Sick Leftist Audience Boos When Colbert Tells Them Trump Is Alive</span>\n\n            <div class=\"clearfix text-formatted f",
+          "published": "Wed, 03 Sep 2025 16:40:00 +0000",
+          "impact_score": 10,
+          "categories": [
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "naked_capitalism",
+    "url": "https://www.nakedcapitalism.com/feed",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 10,
+      "title": "naked capitalism",
+      "description": "Fearless commentary on finance, economics, politics and power",
+      "last_updated": "Wed, 03 Sep 2025 17:41:39 +0000"
+    },
+    "analysis": {
+      "total_articles": 10,
+      "avg_impact_score": 3.8,
+      "high_impact_articles": 3,
+      "category_distribution": {
+        "GENERAL_MARKET": 4,
+        "TRADE": 1,
+        "TECH_DISRUPTION": 4,
+        "GEOPOLITICAL": 1,
+        "CORPORATE_CRISIS": 1,
+        "BANKING": 1,
+        "MARKET_STRUCTURE": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Coffee Break: Trump Family Grab Their Share of the Crypto, Gaza Take",
+          "description": "Donald Trump's family and key cabinet members are grfiting it up and battling one another for power as stresses on the administration build.",
+          "published": "Wed, 03 Sep 2025 18:00:39 +0000",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Tariffs and US Dollar Depreciations: Not So Surprising After All",
+          "description": "How conventional thinking on how the dollar would respond to Trump tariffs missed a key factor: retaliation.",
+          "published": "Wed, 03 Sep 2025 13:55:10 +0000",
+          "impact_score": 14,
+          "categories": [
+            "TRADE"
+          ]
+        },
+        {
+          "title": "Links 9/3/2025",
+          "description": "<a href=\"https://www.nakedcapitalism.com/2025/09/links-9-3-2025.html\"><img alt=\"\" class=\"aligncenter size-large wp-image-297664\" height=\"300\" src=\"https://www.nakedcapitalism.com/wp-content/uploads/20",
+          "published": "Wed, 03 Sep 2025 10:55:02 +0000",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "wolf_street",
+    "url": "https://wolfstreet.com/feed/",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 10,
+      "title": "Wolf Street",
+      "description": "The stories behind business, finance, and money",
+      "last_updated": "Wed, 03 Sep 2025 15:43:04 +0000"
+    },
+    "analysis": {
+      "total_articles": 10,
+      "avg_impact_score": 6.4,
+      "high_impact_articles": 4,
+      "category_distribution": {
+        "BANKING": 3,
+        "MONETARY_POLICY": 3,
+        "MACRO_DATA": 3,
+        "TECH_DISRUPTION": 3,
+        "TRADE": 2,
+        "GENERAL_MARKET": 5
+      },
+      "sample_articles": [
+        {
+          "title": "Office CMBS Delinquency Rate Spikes to Record 11.7%, Much Worse than Financial Crisis Peak. Multifamily Delinquencies also Spike",
+          "description": "Extend-and-pretend and forbearance deals widely implemented to \u201ccure\u201d delinquent CRE mortgages.",
+          "published": "Mon, 01 Sep 2025 16:10:12 +0000",
+          "impact_score": 12,
+          "categories": [
+            "BANKING"
+          ]
+        },
+        {
+          "title": "30-Year Treasury Yield Stuck Near 5% on Inflation Fears, but 6-Month Yield Drops, Sees Rate Cuts, Long End of Yield Curve Steepens a Lot, Mortgage Rates still over 6.5%",
+          "description": "The bond market\u2019s reaction to cocktail of inflation fears, potentially lax Fed, and Mississippi River of new debt flowing into the market.",
+          "published": "Sat, 30 Aug 2025 14:40:43 +0000",
+          "impact_score": 10,
+          "categories": [
+            "MONETARY_POLICY",
+            "MACRO_DATA",
+            "BANKING",
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Core Services PCE Inflation Spikes (Not Tariffed), Durable Goods Inflation (where Tariffs Hit) Turns Negative Month to Month",
+          "description": "Services are where two-thirds of consumer spending goes. And that\u2019s where inflation is. But it\u2019s no longer in rents.",
+          "published": "Fri, 29 Aug 2025 19:39:48 +0000",
+          "impact_score": 16,
+          "categories": [
+            "MONETARY_POLICY",
+            "TRADE",
+            "MACRO_DATA"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "defense_news",
+    "url": "https://www.defensenews.com/arc/outboundfeeds/rss/category/pentagon/?outputType=xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 25,
+      "title": "Defense News",
+      "description": "Defense News News Feed",
+      "last_updated": "Wed, 03 Sep 2025 19:23:53 +0000"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 2.0,
+      "high_impact_articles": 3,
+      "category_distribution": {
+        "TECH_DISRUPTION": 5,
+        "GENERAL_MARKET": 11,
+        "MARKET_STRUCTURE": 3,
+        "GEOPOLITICAL": 4
+      },
+      "sample_articles": [
+        {
+          "title": "Drones, AI and robotics challenge order of Top 100 defense firms",
+          "description": "Massive geopolitical shifts and tech advancements continued to realign the annual Defense News defense-contractor ranking.",
+          "published": "Tue, 02 Sep 2025 16:30:00 +0000",
+          "impact_score": 6,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Trump to announce Space Command is moving from Colorado to Alabama",
+          "description": "Trump is set to announce U.S. Space Command's move to Alabama, reversing\u00a0a Biden-era decision\u00a0to keep it at its temporary headquarters in Colorado.",
+          "published": "Tue, 02 Sep 2025 15:39:14 +0000",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Investors are waking up to the defense sector",
+          "description": "A dynamic shift in the investor perception of the defense industry is underway.",
+          "published": "Tue, 02 Sep 2025 15:33:47 +0000",
+          "impact_score": 0,
+          "categories": [
+            "MARKET_STRUCTURE"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "stratfor",
+    "url": "https://worldview.stratfor.com/rss.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 10,
+      "title": "Stratfor",
+      "description": "",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 10,
+      "avg_impact_score": 3.2,
+      "high_impact_articles": 2,
+      "category_distribution": {
+        "MARKET_STRUCTURE": 6,
+        "GENERAL_MARKET": 2,
+        "GEOPOLITICAL": 4,
+        "MACRO_DATA": 1,
+        "TECH_DISRUPTION": 3
+      },
+      "sample_articles": [
+        {
+          "title": "United States",
+          "description": "<div class=\"field field-name-field-promo-image field-type-image field-label-above\"><div class=\"field-label\">Promo Image:&nbsp;</div><div class=\"field-items\"><div class=\"field-item even\"><img alt=\"Law ",
+          "published": "Fri, 13 Jun 2025 22:11:14 +0000",
+          "impact_score": 0,
+          "categories": [
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "Americas",
+          "description": "<div class=\"field field-name-field-promo-image field-type-image field-label-above\"><div class=\"field-label\">Promo Image:&nbsp;</div><div class=\"field-items\"><div class=\"field-item even\"><img alt=\"Poli",
+          "published": "Fri, 13 Jun 2025 22:11:01 +0000",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "South Asia",
+          "description": "<div class=\"field field-name-field-promo-image field-type-image field-label-above\"><div class=\"field-label\">Promo Image:&nbsp;</div><div class=\"field-items\"><div class=\"field-item even\"><img alt=\"Indi",
+          "published": "Fri, 13 Jun 2025 22:10:48 +0000",
+          "impact_score": 10,
+          "categories": [
+            "GEOPOLITICAL"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "council_foreign_relations",
+    "url": "https://www.cfr.org/feeds/rss.xml",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "bankruptcy_news",
+    "url": "https://www.abi.org/feed",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "sec_news",
+    "url": "https://www.sec.gov/news/pressreleases.rss",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 25,
+      "title": "Press Releases",
+      "description": "Official announcements highlighting recent actions taken by the SEC and other newsworthy information.",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 2.8,
+      "high_impact_articles": 3,
+      "category_distribution": {
+        "TECH_DISRUPTION": 8,
+        "MARKET_STRUCTURE": 20,
+        "CORPORATE_CRISIS": 1,
+        "MONETARY_POLICY": 1
+      },
+      "sample_articles": [
+        {
+          "title": "SEC and CFTC Staff Issue Joint Statement on Trading of Certain Spot Crypto Asset Products",
+          "description": "Staff of the Securities and Exchange Commission (SEC) and the Commodity Futures Trading Commission (CFTC) today issued a Joint Statement regarding the trading of certain spot crypto asset products. Th",
+          "published": "Tue, 02 Sep 2025 15:58:24 -0400",
+          "impact_score": 2,
+          "categories": [
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "SEC Announces Agenda and Panelists for Roundtable on Trade-Through Prohibitions",
+          "description": "The Securities and Exchange Commission today announced the agenda and panelists for its September 18, 2025 roundtable on trade-through prohibitions.\n\nThe roundtable will be held at the SEC\u2019s headquart",
+          "published": "Wed, 27 Aug 2025 16:46:56 -0400",
+          "impact_score": 0,
+          "categories": [
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "SEC Names Judge Margaret Ryan as Director of the Division of Enforcement",
+          "description": "The Securities and Exchange Commission today announced that Judge Margaret \u201cMeg\u201d Ryan has been named Director of the Division of Enforcement, effective Sept. 2, 2025. Acting Director of Enforcement Sa",
+          "published": "Thu, 21 Aug 2025 14:40:00 -0400",
+          "impact_score": 0,
+          "categories": [
+            "MARKET_STRUCTURE"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "corporate_distress",
+    "url": "https://www.reuters.com/business/finance",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "trade_gov",
+    "url": "https://www.trade.gov/rss-feeds/trade-news.xml",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "ustr_releases",
+    "url": "https://ustr.gov/rss.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 10,
+      "title": "United States Trade Representative",
+      "description": "",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 10,
+      "avg_impact_score": 24.0,
+      "high_impact_articles": 8,
+      "category_distribution": {
+        "GENERAL_MARKET": 1,
+        "TRADE": 8,
+        "CORPORATE_CRISIS": 3,
+        "TECH_DISRUPTION": 9,
+        "MARKET_STRUCTURE": 8,
+        "GEOPOLITICAL": 7,
+        "NATURAL_DISASTERS": 1,
+        "MONETARY_POLICY": 1,
+        "MACRO_DATA": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Weekly Trade Focus: APEC",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\" id=\"pageTitle\">Weekly Trade Focus: APEC</span>\n\n            <div class=\"clearfix text-formatted field field--name-body fiel",
+          "published": "Mon, 20 Jul 2009 18:28:39 +0000",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Public Hearing Regarding Section 301 Investigation into Certain Acts, Policies, and Practices of Brazil",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\" id=\"pageTitle\">Public Hearing Regarding Section 301 Investigation into Certain Acts, Policies, and Practices of Brazil</spa",
+          "published": "Tue, 02 Sep 2025 20:44:16 +0000",
+          "impact_score": 10,
+          "categories": [
+            "TRADE",
+            "CORPORATE_CRISIS",
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        },
+        {
+          "title": "Arthur Tsao, Deputy General Counsel for Negotiations, Legislation, and Administrative Law",
+          "description": "<span class=\"field field--name-title field--type-string field--label-hidden\" id=\"pageTitle\">Arthur Tsao, Deputy General Counsel for Negotiations, Legislation, and Administrative Law</span>\n<span class",
+          "published": "Tue, 02 Sep 2025 18:38:41 +0000",
+          "impact_score": 10,
+          "categories": [
+            "GEOPOLITICAL",
+            "TRADE",
+            "CORPORATE_CRISIS",
+            "TECH_DISRUPTION",
+            "MARKET_STRUCTURE"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "customs_news",
+    "url": "https://www.cbp.gov/newsroom/news-releases/rss",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "energy_news",
+    "url": "https://www.energy.gov/rss-feeds/news",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "tech_crunch_finance",
+    "url": "https://techcrunch.com/category/fintech/feed/",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 20,
+      "title": "Fintech News | TechCrunch",
+      "description": "Startup and Technology News",
+      "last_updated": "Wed, 03 Sep 2025 14:30:00 +0000"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 2.7,
+      "high_impact_articles": 2,
+      "category_distribution": {
+        "TECH_DISRUPTION": 13,
+        "GENERAL_MARKET": 4,
+        "BANKING": 5,
+        "CORPORATE_CRISIS": 1,
+        "MARKET_STRUCTURE": 2,
+        "ENERGY": 1,
+        "GEOPOLITICAL": 1
+      },
+      "sample_articles": [
+        {
+          "title": "3 days left to lock in your exhibit table at TechCrunch Disrupt 2025",
+          "description": "Time is running out to showcase your startup in front of the most influential eyes in tech. In just 3 days, the exhibitor table deadline closes for TechCrunch Disrupt 2025 in San Francisco. And with o",
+          "published": "Wed, 03 Sep 2025 14:30:00 +0000",
+          "impact_score": 0,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Klarna revives IPO plans, aims to raise $1.27B",
+          "description": "Swedish buy now, pay later (BNPL) startup Klarna and its shareholders are reviving its initial public offering, hoping to raise as much as $1.27 billion in a listing that would value the company at up",
+          "published": "Tue, 02 Sep 2025 14:30:52 +0000",
+          "impact_score": 8,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Just 4 days left to exhibit at TechCrunch Disrupt 2025 \u2014 10 tables remain",
+          "description": "The clock is ticking, and exhibit space at TechCrunch Disrupt 2025 is moving fast. With just 4 days and 10 table left to book, now\u2019s the time to stop circling the idea and claim your spot on the show ",
+          "published": "Tue, 02 Sep 2025 14:00:00 +0000",
+          "impact_score": 0,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "bank_news",
+    "url": "https://www.americanbanker.com/feed",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "bbc_business",
+    "url": "http://feeds.bbci.co.uk/news/business/rss.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 58,
+      "title": "BBC News",
+      "description": "BBC News - Business",
+      "last_updated": "Wed, 03 Sep 2025 19:25:31 GMT"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 2.5,
+      "high_impact_articles": 3,
+      "category_distribution": {
+        "TECH_DISRUPTION": 9,
+        "MACRO_DATA": 2,
+        "GENERAL_MARKET": 7,
+        "MONETARY_POLICY": 2,
+        "BANKING": 1,
+        "MARKET_STRUCTURE": 1,
+        "GEOPOLITICAL": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Reeves rejects claims of \u00a350bn 'black hole' in finances",
+          "description": "The chancellor hit back at the idea that the government faces so large a gap between spending and tax income.",
+          "published": "Wed, 03 Sep 2025 16:00:44 GMT",
+          "impact_score": 0,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Faisal Islam: Reeves has a bumpy road up to the Budget",
+          "description": "The chancellor hits back at speculation over tax rises, but will need to find the money from somewhere.",
+          "published": "Wed, 03 Sep 2025 16:00:57 GMT",
+          "impact_score": 0,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        },
+        {
+          "title": "Newsmax sues Fox News in battle of right-wing TV networks",
+          "description": "Newsmax accuses its more established rival of engaging in a campaign to stunt its business that violates competition law.",
+          "published": "Wed, 03 Sep 2025 18:37:21 GMT",
+          "impact_score": 2,
+          "categories": [
+            "TECH_DISRUPTION"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "ecb_news",
+    "url": "https://www.ecb.europa.eu/rss/news.html",
+    "status": "FAILED",
+    "error": "Feed parsing failed",
+    "analysis": null
+  },
+  {
+    "name": "bank_japan",
+    "url": "https://www.boj.or.jp/en/rss/whatsnew.xml",
+    "status": "SUCCESS",
+    "feed_info": {
+      "accessible": true,
+      "entries": 48,
+      "title": "Bank of Japan\uff1aRSS",
+      "description": "",
+      "last_updated": "Unknown"
+    },
+    "analysis": {
+      "total_articles": 20,
+      "avg_impact_score": 1.7,
+      "high_impact_articles": 2,
+      "category_distribution": {
+        "GENERAL_MARKET": 13,
+        "BANKING": 4,
+        "TECH_DISRUPTION": 1,
+        "MARKET_STRUCTURE": 1,
+        "MONETARY_POLICY": 1,
+        "MACRO_DATA": 1
+      },
+      "sample_articles": [
+        {
+          "title": "Sources of Changes in Current Account Balances (Projections for Sept.)",
+          "description": "",
+          "published": "Wed, 03 Sep 2025 08:50:00 +0900",
+          "impact_score": 0,
+          "categories": [
+            "GENERAL_MARKET"
+          ]
+        },
+        {
+          "title": "Japanese Government Bonds Held by the Bank of Japan",
+          "description": "",
+          "published": "Tue, 02 Sep 2025 17:00:00 +0900",
+          "impact_score": 0,
+          "categories": [
+            "BANKING"
+          ]
+        },
+        {
+          "title": "Collateral Accepted by the Bank of Japan (End of Aug.)",
+          "description": "",
+          "published": "Tue, 02 Sep 2025 17:00:00 +0900",
+          "impact_score": 0,
+          "categories": [
+            "BANKING"
+          ]
+        }
+      ]
+    }
+  }
+]

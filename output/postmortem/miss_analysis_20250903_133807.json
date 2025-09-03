@@ -1,0 +1,72 @@
+[
+  {
+    "forecast_date": "2025-08-28T13:38:07.885346",
+    "miss_type": "DIRECTIONAL_MISS",
+    "confidence": 0.87,
+    "predicted_direction": "CHOP",
+    "actual_direction": "BEAR",
+    "primary_cause": "VOLATILITY_SHIFT",
+    "cause_confidence": 0.7,
+    "cause_details": "High confidence forecast missed - possible regime change",
+    "correlations_found": 0,
+    "market_context": {
+      "vix_level": "normal",
+      "market_regime": "normal",
+      "volume_profile": "average",
+      "correlation_regime": "normal"
+    },
+    "miss_details": {
+      "predicted": "CHOP",
+      "actual": "BEAR",
+      "high_confidence_miss": true
+    },
+    "analysis_date": "2025-09-03T13:38:07.893944"
+  },
+  {
+    "forecast_date": "2025-08-31T13:38:07.885346",
+    "miss_type": "BAND_BREACH",
+    "confidence": 0.9299999999999999,
+    "predicted_direction": "CHOP",
+    "actual_direction": "CHOP",
+    "primary_cause": "MACRO_RELEASE",
+    "cause_confidence": 0.85,
+    "cause_details": "Economic data: Jobs Report Shows Unexpected Strength",
+    "correlations_found": 1,
+    "market_context": {
+      "vix_level": "normal",
+      "market_regime": "normal",
+      "volume_profile": "average",
+      "correlation_regime": "normal"
+    },
+    "miss_details": {
+      "breached_level": "upper",
+      "target": 5480,
+      "actual": 5490,
+      "high_confidence_miss": true
+    },
+    "analysis_date": "2025-09-03T13:38:07.894563"
+  },
+  {
+    "forecast_date": "2025-09-01T13:38:07.885346",
+    "miss_type": "DIRECTIONAL_MISS",
+    "confidence": 0.95,
+    "predicted_direction": "BULL",
+    "actual_direction": "CHOP",
+    "primary_cause": "MACRO_RELEASE",
+    "cause_confidence": 0.9,
+    "cause_details": "Fed news: Fed Officials Signal Potential Rate Change",
+    "correlations_found": 2,
+    "market_context": {
+      "vix_level": "normal",
+      "market_regime": "normal",
+      "volume_profile": "average",
+      "correlation_regime": "normal"
+    },
+    "miss_details": {
+      "predicted": "BULL",
+      "actual": "CHOP",
+      "high_confidence_miss": true
+    },
+    "analysis_date": "2025-09-03T13:38:07.895190"
+  }
+]
