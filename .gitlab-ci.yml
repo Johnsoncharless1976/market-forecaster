@@ -27,7 +27,7 @@ variables:
 # Morning Operations - Schedule at 08:40 ET weekdays
 morning_operations:
   stage: data_collection
-  tags: ["windows"]
+  #tags: ["windows"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "MORNING"'
     - if: '$RUN_MORNING_MANUALLY == "1"'
@@ -163,7 +163,7 @@ morning_operations:
 # Evening Operations - Schedule at 17:30 ET weekdays  
 evening_operations:
   stage: delivery
-  tags: ["windows"]
+  #tags: ["windows"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "EVENING"'
     - if: '$RUN_EVENING_MANUALLY == "1"'
@@ -228,7 +228,7 @@ evening_operations:
 # Manual data ingestion job (for testing)
 manual_ingestion:
   stage: data_collection
-  tags: ["windows"]
+  #tags: ["windows"]
   rules:
     - if: '$RUN_INGESTION_ONLY == "1"'
   script:
