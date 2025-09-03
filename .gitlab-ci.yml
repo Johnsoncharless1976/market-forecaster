@@ -5,7 +5,7 @@
 stages: [data_collection, forecasting, delivery]
 
 default:
-  image: python:3.11
+  image: python:3.9
   interruptible: true
   cache:
     key: "$CI_PROJECT_NAME-pip-cache"
@@ -130,3 +130,16 @@ news_infrastructure_build:
     - echo "=== TESTING NEWS INTEGRATION ==="
     - python src/test_news_integration.py
     - echo "News infrastructure development completed"
+
+# Automated intraday monitoring development
+intraday_monitoring_build:
+  stage: data_collection  
+  rules:
+    - if: '$BUILD_INTRADAY_MONITORING == "1"'
+  script:
+    - pip install yfinance requests
+    - echo "=== BUILDING INTRADAY MONITORING SYSTEM ==="
+    - python src/build_intraday_monitoring.py
+    - echo "=== TESTING MONITORING INTEGRATION ==="
+    - python src/test_intraday_integration.py
+    - echo "Intraday monitoring system development completed"
