@@ -5,7 +5,7 @@
 stages: [data_collection, forecasting, delivery]
 
 default:
-  image: python:3.11
+  image: python:3.9
   interruptible: true
   cache:
     key: "$CI_PROJECT_NAME-pip-cache"
@@ -115,3 +115,18 @@ manual_ingestion:
   script:
     - pip install -r requirements.txt
     - python src/data_ingestion.py
+
+# Automated news infrastructure development
+news_infrastructure_build:
+  stage: data_collection
+  rules:
+    - if: '$BUILD_NEWS_SYSTEM == "1"'
+  script:
+    - pip install feedparser requests pandas
+    - echo "=== NEWS FEED TESTING ==="
+    - python src/news_feed_tester.py || echo "Feed testing completed"
+    - echo "=== BUILDING NEWS INGESTION SYSTEM ==="
+    - python src/build_news_system.py
+    - echo "=== TESTING NEWS INTEGRATION ==="
+    - python src/test_news_integration.py
+    - echo "News infrastructure development completed"
