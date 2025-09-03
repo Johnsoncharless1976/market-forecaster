@@ -1,17 +1,20 @@
 # zen_council_live_forecaster.py
 #!/usr/bin/env python3
 """
+zen_council_live_forecaster.py
 Zen Council Live Forecasting System - Production Operations
 Using optimized parameters: 67.9% baseline accuracy achieved
 RSI 25/75, VIX 12/24, Volume 1.0x, 3+ confirmations
 Bull >0.15%, Bear <-0.05%, Chop ±0.85%
+
+Integration: GitLab CI scheduled pipeline execution
+Schedule: 8:40 AM ET and 5:00 PM ET weekdays
 """
 
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import snowflake.connector
-from sqlalchemy import create_engine
 import os
 import json
 import smtplib
@@ -70,27 +73,7 @@ class ZenCouncilLiveForecaster:
     
     def load_current_market_data(self, days_back: int = 60) -> pd.DataFrame:
         """Load recent market data for live forecasting"""
-        env_vars = {}
-        try:
-            with open('.env', 'r') as f:
-                for line in f:
-                    if '=' in line and not line.strip().startswith('#'):
-                        key, value = line.strip().split('=', 1)
-                        env_vars[key] = value.strip('"\'')
-        except Exception as e:
-            print(f"Error reading .env file: {e}")
-        
-        # Create SQLAlchemy engine
-        account = env_vars.get('SNOWFLAKE_ACCOUNT') or os.getenv('SNOWFLAKE_ACCOUNT')
-        user = env_vars.get('SNOWFLAKE_USER') or os.getenv('SNOWFLAKE_USER')
-        password = env_vars.get('SNOWFLAKE_PASSWORD') or os.getenv('SNOWFLAKE_PASSWORD')
-        database = env_vars.get('SNOWFLAKE_DATABASE') or os.getenv('SNOWFLAKE_DATABASE') or 'ZEN_MARKET'
-        schema = env_vars.get('SNOWFLAKE_SCHEMA') or os.getenv('SNOWFLAKE_SCHEMA') or 'FORECASTING'
-        warehouse = env_vars.get('SNOWFLAKE_WAREHOUSE') or os.getenv('SNOWFLAKE_WAREHOUSE')
-        
-        engine = create_engine(
-            f'snowflake://{user}:{password}@{account}/{database}/{schema}?warehouse={warehouse}'
-        )
+        conn = self.connect_to_snowflake()
         
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=days_back)
@@ -106,11 +89,12 @@ class ZenCouncilLiveForecaster:
             v.CLOSE as vix_close
         FROM ZEN_MARKET.FORECASTING.SPX_HISTORICAL s
         LEFT JOIN ZEN_MARKET.FORECASTING.VIX_HISTORICAL v ON s.DATE = v.DATE
-        WHERE s.DATE >= %(start_date)s AND s.DATE <= %(end_date)s
+        WHERE s.DATE >= %s AND s.DATE <= %s
         ORDER BY s.DATE
         """
         
-        df = pd.read_sql(query, engine, params={'start_date': start_date, 'end_date': end_date})
+        df = pd.read_sql(query, conn, params=[start_date, end_date])
+        conn.close()
         
         # Convert column names to lowercase
         df.columns = df.columns.str.lower()
@@ -328,17 +312,17 @@ class ZenCouncilLiveForecaster:
         cursor.execute(insert_query, (
             forecast['timestamp'],
             forecast['date'],
-            float(forecast['spx_close']),
-            float(forecast['vix_close']),
+            forecast['spx_close'],
+            forecast['vix_close'],
             forecast['forecast_bias'],
-            int(forecast['confidence_level']),
-            int(forecast['bull_signals']),
-            int(forecast['bear_signals']),
-            int(forecast['chop_signals']),
+            forecast['confidence_level'],
+            forecast['bull_signals'],
+            forecast['bear_signals'],
+            forecast['chop_signals'],
             forecast['signal_details'],
-            float(forecast['technical_data']['rsi']),
+            forecast['technical_data']['rsi'],
             forecast['technical_data']['vix_regime'],
-            float(forecast['technical_data']['volume_ratio']),
+            forecast['technical_data']['volume_ratio'],
             forecast['council_version']
         ))
         
@@ -431,25 +415,32 @@ class ZenCouncilLiveForecaster:
             return []
     
     def send_forecast_email(self, forecast: dict):
-        """Send forecast via email to subscribers from database"""
+        """Send forecast via email to subscribers using GitLab CI environment variables"""
         
-        # Read email configuration from .env file manually
-        env_vars = {}
-        try:
-            with open('.env', 'r') as f:
-                for line in f:
-                    if '=' in line and not line.strip().startswith('#'):
-                        key, value = line.strip().split('=', 1)
-                        env_vars[key] = value.strip('"\'')
-        except Exception as e:
-            print(f"Error reading .env file for email config: {e}")
-            return
+        # Try GitLab CI environment variables first, then .env file
+        smtp_server = os.getenv('SMTP_HOST')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        email_user = os.getenv('SMTP_USER')
+        email_password = os.getenv('SMTP_PASS')
         
-        # Use your exact .env variable names
-        smtp_server = env_vars.get('SMTP_HOST')
-        smtp_port = int(env_vars.get('SMTP_PORT', '587'))
-        email_user = env_vars.get('SMTP_USER')
-        email_password = env_vars.get('SMTP_PASS')
+        # Fallback to .env file if environment variables not set
+        if not smtp_server:
+            try:
+                with open('.env', 'r') as f:
+                    for line in f:
+                        if '=' in line and not line.strip().startswith('#'):
+                            key, value = line.strip().split('=', 1)
+                            value = value.strip('"\'')
+                            if key == 'SMTP_HOST' and not smtp_server:
+                                smtp_server = value
+                            elif key == 'SMTP_PORT' and smtp_port == 587:
+                                smtp_port = int(value)
+                            elif key == 'SMTP_USER' and not email_user:
+                                email_user = value
+                            elif key == 'SMTP_PASS' and not email_password:
+                                email_password = value
+            except FileNotFoundError:
+                print("No .env file found - using GitLab CI environment variables only")
         
         # Get recipients from database instead of .env
         recipient_list = self.get_email_recipients()
@@ -459,6 +450,7 @@ class ZenCouncilLiveForecaster:
         
         if not all([smtp_server, email_user, email_password]) or not recipient_list:
             print("Email configuration incomplete - forecast not sent")
+            print("Required: SMTP_HOST, SMTP_USER, SMTP_PASS environment variables")
             return
         
         print(f"Email config - Server: {smtp_server}, Port: {smtp_port}")
