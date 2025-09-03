@@ -27,28 +27,14 @@ variables:
 # Morning Operations - Schedule at 08:40 ET weekdays
 morning_operations:
   stage: data_collection
-  #tags: ["windows"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "MORNING"'
     - if: '$RUN_MORNING_MANUALLY == "1"'
   script:
-    # 1. Create environment configuration
-    - |
-      $env_vars = @(
-        "ANTHROPIC_API_KEY", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD", "SNOWFLAKE_ACCOUNT",
-        "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
-        "SMTP_USER", "SMTP_PASS", "EMAIL_TO", "FROM_EMAIL"
-      )
-      $env_lines = @()
-      foreach($var in $env_vars) {
-        $value = [Environment]::GetEnvironmentVariable($var)
-        if($value) { $env_lines += "$var=$value" }
-      }
-      if($env_lines.Count -gt 0) {
-        $env_lines -join "`n" | Set-Content -Path .env -Encoding UTF8
-        Write-Host "Environment configured with $($env_lines.Count) variables"
-      }
-
+    - echo "Setting up environment variables"
+    - python --version
+    - pip install -r requirements.txt
+    - python src/data_ingestion.py
     # 2. Setup Python environment
     - |
       if (Test-Path .\.venv\Scripts\Activate.ps1) {
