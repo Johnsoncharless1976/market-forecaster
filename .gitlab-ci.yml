@@ -5,7 +5,7 @@
 stages: [data_collection, forecasting, delivery]
 
 default:
-  image: python:3.9
+  image: python:3.11
   interruptible: true
   cache:
     key: "$CI_PROJECT_NAME-pip-cache"
