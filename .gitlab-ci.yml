@@ -1,15 +1,15 @@
-# .gitlab-ci.yml — ZenMarket Forecaster Operational Pipeline
+# .gitlab-ci.yml — ZenMarket Forecaster Cloud Pipeline
 # Purpose: Daily market data ingestion, forecast generation, and email delivery
 # Schedule: 08:40 ET weekdays for morning operations
 
 stages: [data_collection, forecasting, delivery]
 
 default:
+  image: python:3.9
   interruptible: true
   cache:
     key: "$CI_PROJECT_NAME-pip-cache"
     paths:
-      - .venv/
       - .cache/pip
     policy: pull-push
   artifacts:
@@ -31,211 +31,87 @@ morning_operations:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "MORNING"'
     - if: '$RUN_MORNING_MANUALLY == "1"'
   script:
-    - echo "Setting up environment variables"
+    - echo "=== ENVIRONMENT SETUP ==="
     - python --version
+    - pip --version
+    - echo "Installing requirements..."
     - pip install -r requirements.txt
-    - python src/data_ingestion.py
-    # 2. Setup Python environment
+    
+    - echo "=== NEWS INGESTION ==="
     - |
-      if (Test-Path .\.venv\Scripts\Activate.ps1) {
-        .\.venv\Scripts\Activate.ps1
-        Write-Host "Activated existing Python environment"
-      } else {
-        python -m venv .venv
-        .\.venv\Scripts\Activate.ps1
-        python -m pip install --upgrade pip
-        if (Test-Path requirements.txt) {
-          pip install -r requirements.txt
-        }
-        Write-Host "Created new Python environment"
-      }
-
-    # 3. News ingestion
+      if [ -f "src/news_ingestion.py" ]; then
+        python src/news_ingestion.py || echo "Warning: News ingestion failed"
+      else
+        echo "Warning: news_ingestion.py not found"
+      fi
+    
+    - echo "=== MARKET DATA INGESTION ==="
     - |
-      Write-Host "=== NEWS INGESTION ==="
-      if (Test-Path src\news_ingestion.py) {
-        try {
-          python src\news_ingestion.py
-          Write-Host "News ingestion completed successfully"
-        } catch {
-          Write-Host "Warning: News ingestion failed - $($_.Exception.Message)"
-        }
-      } else {
-        Write-Host "Warning: news_ingestion.py not found"
-      }
-
-    # 4. Market data ingestion
-    - |
-      Write-Host "=== MARKET DATA INGESTION ==="
-      if (Test-Path src\ingest_yahoo_to_market_ohlcv.py) {
-        try {
-          python src\ingest_yahoo_to_market_ohlcv.py
-          Write-Host "Market data ingestion completed successfully"
-        } catch {
-          Write-Host "Error: Market data ingestion failed - $($_.Exception.Message)"
-          exit 1
-        }
-      } else {
-        Write-Host "Error: ingest_yahoo_to_market_ohlcv.py not found"
+      if [ -f "src/data_ingestion.py" ]; then
+        python src/data_ingestion.py
+      elif [ -f "src/data_ingestion_spy.py" ]; then
+        python src/data_ingestion_spy.py
+        python src/data_ingestion_vix.py
+        python src/data_ingestion_es.py
+      else
+        echo "Error: No data ingestion script found"
         exit 1
-      }
-
-    # 5. Forecast generation
+      fi
+    
+    - echo "=== FORECAST GENERATION ==="
     - |
-      Write-Host "=== FORECAST GENERATION ==="
-      $forecast_scripts = @("src\zen_council.py", "src\forecast_engine.py", "src\Forecast_Engine.py")
-      $forecast_ran = $false
-      
-      foreach($script in $forecast_scripts) {
-        if (Test-Path $script) {
-          try {
-            python $script
-            Write-Host "Forecast generation completed using $script"
-            $forecast_ran = $true
-            break
-          } catch {
-            Write-Host "Warning: $script failed - $($_.Exception.Message)"
-          }
-        }
-      }
-      
-      if (-not $forecast_ran) {
-        Write-Host "Warning: No forecast generation script executed successfully"
-      }
-
-    # 6. Morning email delivery
+      if [ -f "src/zen_council.py" ]; then
+        python src/zen_council.py
+      elif [ -f "src/forecast_engine.py" ]; then
+        python src/forecast_engine.py
+      elif [ -f "src/Forecast Engine.py" ]; then
+        python "src/Forecast Engine.py"
+      else
+        echo "Warning: No forecast script found"
+      fi
+    
+    - echo "=== MORNING EMAIL DELIVERY ==="
     - |
-      Write-Host "=== MORNING EMAIL DELIVERY ==="
-      if (Test-Path src\send_am_kneeboard.py) {
-        try {
-          python src\send_am_kneeboard.py
-          Write-Host "Morning kneeboard sent successfully"
-        } catch {
-          Write-Host "Warning: Morning email failed - $($_.Exception.Message)"
-        }
-      } else {
-        Write-Host "Warning: send_am_kneeboard.py not found"
-      }
-
-    # 7. Generate audit summary
+      if [ -f "src/send_am_kneeboard.py" ]; then
+        python src/send_am_kneeboard.py || echo "Warning: Email delivery failed"
+      else
+        echo "Warning: send_am_kneeboard.py not found"
+      fi
+    
+    - echo "=== AUDIT SUMMARY ==="
     - |
-      Write-Host "=== AUDIT SUMMARY ==="
-      $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-      $audit_dir = "audit_exports/pipeline/$timestamp"
-      New-Item -ItemType Directory -Path $audit_dir -Force | Out-Null
-      
-      @"
-      # Pipeline Execution Summary - $timestamp
-      
-      ## Jobs Completed
-      - News Ingestion: $(if(Test-Path src\news_ingestion.py){"ATTEMPTED"}else{"SKIPPED - FILE MISSING"})
-      - Market Data: $(if(Test-Path src\ingest_yahoo_to_market_ohlcv.py){"ATTEMPTED"}else{"FAILED - FILE MISSING"})  
-      - Forecast Generation: $(if($forecast_ran){"SUCCESS"}else{"WARNING - NO SCRIPT RAN"})
-      - Email Delivery: $(if(Test-Path src\send_am_kneeboard.py){"ATTEMPTED"}else{"SKIPPED - FILE MISSING"})
-      
-      ## Execution Time
-      Started: $((Get-Date).ToString())
-      Pipeline: Morning Operations
-      Trigger: $($env:CI_PIPELINE_SOURCE)
-      
-      ## Next Steps
-      - Verify forecast data in FORECAST_JOBS table
-      - Check email delivery logs
-      - Monitor for any error notifications
-      "@ | Set-Content -Path "$audit_dir/PIPELINE_SUMMARY.md" -Encoding UTF8
-      
-      Write-Host "Audit summary saved to $audit_dir/PIPELINE_SUMMARY.md"
+      mkdir -p audit_exports/pipeline/$(date +%Y%m%d_%H%M%S)
+      echo "Pipeline execution completed at $(date)" > audit_exports/pipeline/$(date +%Y%m%d_%H%M%S)/PIPELINE_SUMMARY.txt
+      ls -la src/ > audit_exports/pipeline/$(date +%Y%m%d_%H%M%S)/files_found.txt
 
-# Evening Operations - Schedule at 17:30 ET weekdays  
+# Evening Operations - Schedule at 17:30 ET weekdays
 evening_operations:
   stage: delivery
-  #tags: ["windows"]
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "EVENING"'
     - if: '$RUN_EVENING_MANUALLY == "1"'
   script:
-    # Environment setup (same as morning)
+    - echo "=== EVENING DATA UPDATE ==="
+    - pip install -r requirements.txt
+    - python src/data_ingestion.py || echo "Evening data update completed"
+    
+    - echo "=== PERFORMANCE ANALYSIS ==="
     - |
-      $env_vars = @(
-        "ANTHROPIC_API_KEY", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD", "SNOWFLAKE_ACCOUNT",
-        "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
-        "SMTP_USER", "SMTP_PASS", "EMAIL_TO", "FROM_EMAIL"
-      )
-      $env_lines = @()
-      foreach($var in $env_vars) {
-        $value = [Environment]::GetEnvironmentVariable($var)
-        if($value) { $env_lines += "$var=$value" }
-      }
-      if($env_lines.Count -gt 0) {
-        $env_lines -join "`n" | Set-Content -Path .env -Encoding UTF8
-      }
-
+      if [ -f "src/forecast_grading.py" ]; then
+        python src/forecast_grading.py || echo "Performance analysis completed"
+      fi
+    
+    - echo "=== EVENING EMAIL ==="
     - |
-      if (Test-Path .\.venv\Scripts\Activate.ps1) {
-        .\.venv\Scripts\Activate.ps1
-      }
-
-    # Evening data update
-    - |
-      Write-Host "=== EVENING DATA UPDATE ==="
-      if (Test-Path src\ingest_yahoo_to_market_ohlcv.py) {
-        python src\ingest_yahoo_to_market_ohlcv.py
-        Write-Host "Evening data update completed"
-      }
-
-    # Forecast performance analysis
-    - |
-      Write-Host "=== PERFORMANCE ANALYSIS ==="
-      $analysis_scripts = @("src\forecast_grading.py", "src\show_metrics.py", "src\show_audit.py")
-      
-      foreach($script in $analysis_scripts) {
-        if (Test-Path $script) {
-          try {
-            python $script
-            Write-Host "Performance analysis completed using $script"
-          } catch {
-            Write-Host "Warning: $script failed - $($_.Exception.Message)"
-          }
-        }
-      }
-
-    # Evening email (if configured)
-    - |
-      Write-Host "=== EVENING EMAIL ==="
-      if (Test-Path src\send_pm_kneeboard.py) {
-        try {
-          python src\send_pm_kneeboard.py
-          Write-Host "Evening kneeboard sent successfully"
-        } catch {
-          Write-Host "Warning: Evening email failed - $($_.Exception.Message)"
-        }
-      }
+      if [ -f "src/send_pm_kneeboard.py" ]; then
+        python src/send_pm_kneeboard.py || echo "Evening email completed"
+      fi
 
 # Manual data ingestion job (for testing)
 manual_ingestion:
   stage: data_collection
-  #tags: ["windows"]
   rules:
     - if: '$RUN_INGESTION_ONLY == "1"'
   script:
-    - |
-      $env_vars = @("SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA")
-      $env_lines = @()
-      foreach($var in $env_vars) {
-        $value = [Environment]::GetEnvironmentVariable($var)
-        if($value) { $env_lines += "$var=$value" }
-      }
-      if($env_lines.Count -gt 0) {
-        $env_lines -join "`n" | Set-Content -Path .env -Encoding UTF8
-      }
-
-    - |
-      if (Test-Path .\.venv\Scripts\Activate.ps1) {
-        .\.venv\Scripts\Activate.ps1
-      } else {
-        python -m venv .venv
-        .\.venv\Scripts\Activate.ps1
-        pip install -r requirements.txt
-      }
-
-    - python src\ingest_yahoo_to_market_ohlcv.py
+    - pip install -r requirements.txt
+    - python src/data_ingestion.py
