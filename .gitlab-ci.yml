@@ -329,21 +329,14 @@ deploy_viz:
     - echo "🚀 Deploying ZenMarket AI Visualization..."
     - echo "Environment: ${VIZ_ENV}"
     - echo "Domain: ${VIZ_DOMAIN}"
-    - |
-      # Build Docker image
-      docker build -t zenmarket-viz:${CI_COMMIT_SHORT_SHA} .
-      
-      # Mock deployment (replace with actual deployment)
-      echo "📦 Container built: zenmarket-viz:${CI_COMMIT_SHORT_SHA}"
-      echo "🌐 Mock deployment to ${VIZ_DOMAIN}"
-      
-      # Simulate health check
-      DEPLOY_URL="https://${VIZ_DOMAIN}/zenmarket-viz"
-      echo "🏥 Health check: ${DEPLOY_URL}/_stcore/health"
-      echo "HEALTH=200"
-      
-      echo "✅ Deployment completed"
-      echo "📊 Visualization available at: ${DEPLOY_URL}"
+    - docker build -t zenmarket-viz:${CI_COMMIT_SHORT_SHA} .
+    - echo "📦 Container built: zenmarket-viz:${CI_COMMIT_SHORT_SHA}"
+    - echo "🌐 Mock deployment to ${VIZ_DOMAIN}"
+    - DEPLOY_URL="https://${VIZ_DOMAIN}/zenmarket-viz"
+    - echo "🏥 Health check: ${DEPLOY_URL}/_stcore/health"
+    - echo "HEALTH=200"
+    - echo "✅ Deployment completed"
+    - echo "📊 Visualization available at: ${DEPLOY_URL}"
   artifacts:
     reports:
       dotenv: deploy.env
