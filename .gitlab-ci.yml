@@ -169,17 +169,6 @@ zen_council_backtest:
   rules:
     - if: '$RUN_ZEN_COUNCIL_BACKTEST == "1"'
   script:
-<<<<<<< HEAD
-    - chmod +x ci/mirror_and_runner_health.sh
-    - ./ci/mirror_and_runner_health.sh
-    - chmod +x ci/kneeboard_slo_tracker.sh
-    - ./ci/kneeboard_slo_tracker.sh
-  artifacts:
-    paths:
-      - audit_exports/daily/
-    expire_in: 1 week
-  allow_failure: false
-=======
     - echo "=== ZEN COUNCIL BACKTEST EXECUTION ==="
     - pip install -r requirements.txt
     - |
@@ -189,7 +178,11 @@ zen_council_backtest:
         echo "Error: zen_council_refined_backtest_system.py not found"
         exit 1
       fi
->>>>>>> 7a15e66e1be33fb28e1b5fd389dcf191138cce5a
+  artifacts:
+    paths:
+      - audit_exports/daily/
+    expire_in: 1 week
+  allow_failure: false
 
 # Automated news infrastructure development
 news_infrastructure_build:
@@ -212,7 +205,6 @@ intraday_monitoring_build:
   rules:
     - if: '$BUILD_INTRADAY_MONITORING == "1"'
   script:
-<<<<<<< HEAD
     - echo "🔄 Stage 4 (forecast) jobs enabled - STAGE_OPEN_4=true"
     - python src/stage4_forecast.py
   artifacts:
@@ -428,11 +420,3 @@ smoke_tests:
 #   only:
 #     - stage9-commercial
 #   when: manual
-=======
-    - pip install yfinance requests
-    - echo "=== BUILDING INTRADAY MONITORING SYSTEM ==="
-    - python src/build_intraday_monitoring.py
-    - echo "=== TESTING MONITORING INTEGRATION ==="
-    - python src/test_intraday_integration.py
-    - echo "Intraday monitoring system development completed"
->>>>>>> 7a15e66e1be33fb28e1b5fd389dcf191138cce5a
