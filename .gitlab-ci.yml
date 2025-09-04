@@ -315,30 +315,9 @@ viz:
 # =========================
 deploy_viz:
   stage: viz
-  image: docker:latest
-  services:
-    - docker:dind
-  needs: ["viz"]
+  script: echo "🚀 Deployment placeholder - STAGE_OPEN_6 required"
   rules:
-    - if: $STAGE_OPEN_6 == "true" && $VIZ_ENV != null
-      when: on_success
-    - when: never
-  before_script:
-    - apk add --no-cache curl
-  script:
-    - echo "🚀 Deploying ZenMarket AI Visualization..."
-    - echo "Environment: ${VIZ_ENV}"
-    - echo "Domain: ${VIZ_DOMAIN}"
-    - docker build -t zenmarket-viz:${CI_COMMIT_SHORT_SHA} .
-    - echo "📦 Container built: zenmarket-viz:${CI_COMMIT_SHORT_SHA}"
-    - echo "🌐 Mock deployment to ${VIZ_DOMAIN}"
-    - DEPLOY_URL="https://${VIZ_DOMAIN}/zenmarket-viz"
-    - echo "🏥 Health check: ${DEPLOY_URL}/_stcore/health"
-    - echo "HEALTH=200"
-    - echo "✅ Deployment completed"
-    - echo "📊 Visualization available at: ${DEPLOY_URL}"
-  artifacts:
-    expire_in: 1 hour
+    - if: $STAGE_OPEN_6 == "true"
 
 # =========================
 # Stage 6: Smoke Tests (Post-Deploy)
