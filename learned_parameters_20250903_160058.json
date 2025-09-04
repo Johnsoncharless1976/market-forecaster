@@ -1,0 +1,25 @@
+{
+  "overall_accuracy": 47.201946472019465,
+  "total_samples": 411,
+  "bias_performance": {
+    "Bearish": {
+      "count": 161,
+      "accuracy": 0.40993788819875776
+    },
+    "Bullish": {
+      "count": 46,
+      "accuracy": 0.5869565217391305
+    },
+    "Neutral": {
+      "count": 204,
+      "accuracy": 0.4950980392156863
+    }
+  },
+  "move_analysis": {
+    "small_moves_accuracy": 0.7107843137254902,
+    "medium_moves_accuracy": 0.21951219512195122,
+    "large_moves_accuracy": 0.3023255813953488
+  },
+  "learning_date": "2025-09-03T16:00:58.342278",
+  "source_file": "learning_corpus_20250903_155213.json"
+}

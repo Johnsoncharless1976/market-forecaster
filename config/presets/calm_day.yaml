@@ -1,0 +1,30 @@
+preset_name: "Calm Day"
+description: "Low volatility, trending market conditions"  
+status: "CANDIDATE_ONLY"
+
+council_parameters:
+  blend_lambda: 0.55  # Lower blend (trust baseline more)
+  beta_binomial_alpha_0: 1
+  beta_binomial_beta_0: 1
+  miss_penalty_pct: 6.0   # Lower miss penalty (easier conditions)
+  vol_guard_widen_pct: 8.0   # Tighter bands (low vol)
+
+impact_thresholds:
+  news_threshold: 0.40  # Higher threshold (less news sensitivity)
+  macro_threshold: 1.2   # Higher threshold (stable macro)
+  band_adjustment_pct: 3.0   # Smaller adjustments
+  confidence_adjustment_pct: 6.0  # Higher confidence
+
+magnet_engine:
+  enabled: true  # Light magnet effect
+  gamma: 0.20    # Low center nudge
+  beta: 0.05     # Light width tightening
+  
+source_weights:
+  wsj: 0.80      # Lower weights (less news impact)
+  reuters: 0.75
+  benzinga: 0.30
+  schwab: 0.25  
+  zerohedge_cap: 0.15
+
+use_case: "Low VIX days, holiday weeks, summer trading, trending markets"

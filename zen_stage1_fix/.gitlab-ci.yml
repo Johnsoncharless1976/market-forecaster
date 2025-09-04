@@ -1,0 +1,42 @@
+# ZEN COMMIT HEADER
+# Title: Stage 1 Ingestion Pipeline (GitLab CI)
+# Purpose: Run Yahoo → Snowflake ingestion with fail-fast + diffs at schedule and on-demand.
+# Notes: Use project-level CI/CD Variables for all Snowflake creds. SPY retired.
+
+stages:
+  - ingest
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .cache/pip
+
+ingest_yahoo:
+  stage: ingest
+  image: python:3.11-slim
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$RUN_INGEST == "1"'
+    - when: manual
+  before_script:
+    - python -V
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - python src/ingest_yahoo_to_snowflake.py --symbols "^VIX,^VVIX,^GSPC,ES=F" --strict-zero-write
+  environment:
+    name: production
+  artifacts:
+    when: always
+    expire_in: 14 days
+    paths:
+      - ingest.log
+  after_script:
+    - echo "Pipeline finished at $(date -u)"
+
+# Scheduling:
+# Create a Pipeline Schedule in GitLab UI with CRON like "35 12 * * 1-5" (12:35 UTC = 8:35 ET)
+# Set variable RUN_INGEST=1 in the schedule and ensure all Snowflake vars are present.

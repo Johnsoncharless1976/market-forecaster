@@ -1,0 +1,43 @@
+# orchestrator.yaml
+# Central mapping of commands the orchestrator can run.
+# Use SHELL: prefix if you need shell features (pipes, &&, PowerShell, etc.)
+
+modules:
+  # --- Claude Runner Suite ---
+  runner: "streamlit run streamlit_claude_ui.py"
+  explorer: "streamlit run prompt_explorer.py"
+  analytics: "streamlit run claude_analytics_view.py"
+  digest: "python daily_digest_email_notion_sync.py"
+  slack: "python send_slack_digest.py"
+  audit: "python audit_summary_cli.py"
+  scorer: "python claude_forecast_scorer.py"
+
+  # --- ZenMarket AI Forecaster (adjust paths as needed) ---
+  forecast-ingest: "python src/pipeline/ingest_daily.py"
+  forecast-features: "python src/pipeline/build_features.py"
+  forecast-train: "python src/pipeline/train_model.py"
+  forecast-predict: "python src/pipeline/predict_today.py"
+  forecast-score: "python claude_forecast_scorer.py"
+  
+  # Example PowerShell stage (Windows only) — use SHELL: to allow ps1
+  stage1-weekday: "SHELL:powershell -ExecutionPolicy Bypass -File stage1_weekday.ps1"
+
+groups:
+  # Web UIs in one go
+  all-web:
+    - runner
+    - explorer
+    - analytics
+
+  # Reporting batch
+  all-reports:
+    - audit
+    - digest
+    - slack
+
+  # Full forecast pass (Claude-efficient order)
+  forecast-all:
+    - forecast-ingest
+    - forecast-features
+    - forecast-predict
+    - forecast-score

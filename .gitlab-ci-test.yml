@@ -1,0 +1,26 @@
+image: python:3.11
+
+stages:
+  - exec
+  - audit
+
+exec_job:
+  stage: exec
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "EXEC JOB RUNNING"
+    - mkdir -p test_output
+    - echo "test" > test_output/file.txt
+  artifacts:
+    paths:
+      - test_output/
+
+audit_job:
+  stage: audit
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - echo "AUDIT JOB RUNNING"
+    - ls -la
+    - ls -la test_output/ || echo "No test_output"

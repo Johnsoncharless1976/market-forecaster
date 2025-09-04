@@ -1,0 +1,40 @@
+[
+  {
+    "news_id": "news_001",
+    "news_title": "Fed Officials Signal Potential Rate Change",
+    "news_source": "fed_news",
+    "news_category": "macro_policy",
+    "news_time": "2025-09-02T13:32:03.141487",
+    "news_relevance": 95,
+    "symbol": "^VIX",
+    "market_time": "2025-09-02T13:32:03.142989",
+    "time_diff_hours": 4.1722222222222226e-07,
+    "pct_change": 5.555555555555555,
+    "intraday_range": 16.666666666666664,
+    "move_direction": "down",
+    "correlation_strength": 1.0122222117916668,
+    "market_open": 18.0,
+    "market_close": 17.0,
+    "market_high": 19.0,
+    "market_low": 16.0
+  },
+  {
+    "news_id": "news_002",
+    "news_title": "Jobs Report Shows Unexpected Strength",
+    "news_source": "cnbc_economy",
+    "news_category": "economic_data",
+    "news_time": "2025-09-01T13:32:03.141495",
+    "news_relevance": 85,
+    "symbol": "^VIX",
+    "market_time": "2025-09-01T13:32:03.142989",
+    "time_diff_hours": 4.1500000000000005e-07,
+    "pct_change": 5.405405405405405,
+    "intraday_range": 16.216216216216218,
+    "move_direction": "down",
+    "correlation_strength": 0.9727026923277028,
+    "market_open": 18.5,
+    "market_close": 17.5,
+    "market_high": 19.5,
+    "market_low": 16.5
+  }
+]
