@@ -79,48 +79,235 @@ def get_recipients_from_snowflake() -> list[str]:
 
 def build_email_content(forecast_data: dict) -> str:
     """
-    Commit Note: Formats forecast data into HTML for email delivery.
+    Commit Note: Formats forecast data into professional dark theme HTML for email delivery.
     """
     html_body = f"""
+    <!DOCTYPE html>
     <html>
     <head>
-      <style>
-        body {{
-          font-family: Arial, sans-serif;
-          background-color: #0d1117;
-          color: #e6edf3;
-          padding: 20px;
-        }}
-        h1 {{
-          color: #58a6ff;
-        }}
-        .section-title {{
-          color: #f78166;
-          margin-top: 20px;
-        }}
-        .data-block {{
-          background-color: #161b22;
-          padding: 15px;
-          border-radius: 8px;
-          margin-bottom: 15px;
-        }}
-      </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ZeroDay Zen Forecast</title>
+        <style>
+            body {{
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background-color: #1a1a1a;
+                color: #ffffff;
+                margin: 0;
+                padding: 20px;
+                line-height: 1.6;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 0 auto;
+                background-color: #2d2d2d;
+                border-radius: 10px;
+                padding: 25px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            }}
+            .header {{
+                text-align: center;
+                border-bottom: 2px solid #4a90e2;
+                padding-bottom: 15px;
+                margin-bottom: 20px;
+            }}
+            .title {{
+                font-size: 24px;
+                font-weight: bold;
+                color: #4a90e2;
+                margin: 0;
+            }}
+            .subtitle {{
+                font-size: 14px;
+                color: #b0b0b0;
+                margin: 5px 0 0 0;
+            }}
+            .timestamp {{
+                font-size: 12px;
+                color: #888;
+                font-style: italic;
+            }}
+            .section {{
+                margin: 20px 0;
+                background-color: #3a3a3a;
+                border-radius: 8px;
+                padding: 15px;
+                border-left: 4px solid;
+            }}
+            .section-title {{
+                font-size: 16px;
+                font-weight: bold;
+                margin: 0 0 10px 0;
+                display: flex;
+                align-items: center;
+            }}
+            .emoji {{
+                margin-right: 8px;
+                font-size: 18px;
+            }}
+            .data-grid {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+                margin: 10px 0;
+            }}
+            .data-item {{
+                background-color: #4a4a4a;
+                padding: 10px;
+                border-radius: 5px;
+            }}
+            .data-label {{
+                font-size: 12px;
+                color: #b0b0b0;
+                margin-bottom: 3px;
+            }}
+            .data-value {{
+                font-size: 14px;
+                font-weight: bold;
+                color: #ffffff;
+            }}
+            .bias-neutral {{ border-left-color: #ffa500; }}
+            .bias-bull {{ border-left-color: #28a745; }}
+            .bias-bear {{ border-left-color: #dc3545; }}
+            .levels {{ border-left-color: #ffd700; }}
+            .path {{ border-left-color: #17a2b8; }}
+            .trade {{ border-left-color: #6f42c1; }}
+            .news {{ border-left-color: #20c997; }}
+            .summary {{ border-left-color: #28a745; }}
+            .resistance {{ color: #dc3545; font-weight: bold; }}
+            .support {{ color: #28a745; font-weight: bold; }}
+            .neutral-text {{ color: #ffa500; font-weight: bold; }}
+            .news-link {{
+                color: #4a90e2;
+                text-decoration: none;
+                font-size: 13px;
+            }}
+            .news-link:hover {{
+                text-decoration: underline;
+            }}
+            .zen-analysis {{
+                font-style: italic;
+                color: #b0b0b0;
+                margin-top: 8px;
+            }}
+            .footer {{
+                text-align: center;
+                margin-top: 25px;
+                padding-top: 15px;
+                border-top: 1px solid #555;
+                color: #888;
+                font-size: 12px;
+            }}
+        </style>
     </head>
     <body>
-      <h1>📈 ZeroDay Zen Forecast – {forecast_data.get("date","")}</h1>
-      <div class="data-block">
-        <p><b>SPX Spot:</b> {forecast_data.get("spx","")}</p>
-        <p><b>/MES:</b> {forecast_data.get("mes","")}</p>
-        <p><b>VIX:</b> {forecast_data.get("vix","")}</p>
-        <p><b>VVIX:</b> {forecast_data.get("vvix","")}</p>
-      </div>
-      <div class="data-block">
-        <p><b>Bias:</b> {forecast_data.get("bias","")}</p>
-        <p><b>Notes:</b> {forecast_data.get("notes","")}</p>
-      </div>
-      <p style="margin-top:30px; font-size:12px; color:#8b949e;">
-        Generated automatically by ZenMarket AI – format_and_send_forecast.py
-      </p>
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <div class="title">🌟 ZeroDay Zen Forecast</div>
+                <div class="subtitle">📊 ZeroDay Zen Forecast – {forecast_data.get("date", "")}</div>
+                <div class="timestamp">Sent automatically by Zen Market AI</div>
+            </div>
+
+            <!-- Market Data -->
+            <div class="data-grid">
+                <div class="data-item">
+                    <div class="data-label">SPX</div>
+                    <div class="data-value">{forecast_data.get("spx", "N/A")}</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">/ES</div>
+                    <div class="data-value">{forecast_data.get("mes", "N/A")}</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">VIX</div>
+                    <div class="data-value">{forecast_data.get("vix", "N/A")}</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-label">VVIX</div>
+                    <div class="data-value">{forecast_data.get("vvix", "N/A")}</div>
+                </div>
+            </div>
+
+            <!-- Bias Section -->
+            <div class="section bias-neutral">
+                <div class="section-title">
+                    <span class="emoji">🎯</span>
+                    Bias
+                </div>
+                <div class="neutral-text">{forecast_data.get("bias", "Neutral")}</div>
+            </div>
+
+            <!-- Key Levels -->
+            <div class="section levels">
+                <div class="section-title">
+                    <span class="emoji">⚡</span>
+                    Key Levels
+                </div>
+                <div style="margin: 10px 0;">
+                    <div style="margin: 5px 0;">
+                        <span class="resistance">Resistance:</span> {forecast_data.get("resistance", "TBD")}
+                    </div>
+                    <div style="margin: 5px 0;">
+                        <span class="support">Support:</span> {forecast_data.get("support", "TBD")}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Probable Path -->
+            <div class="section path">
+                <div class="section-title">
+                    <span class="emoji">📊</span>
+                    Probable Path
+                </div>
+                <div>
+                    <div><strong>Base Case:</strong> {forecast_data.get("base_case", "TBD")}</div>
+                    <div><strong>Bear Case:</strong> {forecast_data.get("bear_case", "TBD")}</div>
+                    <div><strong>Bull Case:</strong> {forecast_data.get("bull_case", "TBD")}</div>
+                </div>
+            </div>
+
+            <!-- Trade Implications -->
+            <div class="section trade">
+                <div class="section-title">
+                    <span class="emoji">⚖️</span>
+                    Trade Implications
+                </div>
+                <div>
+                    {forecast_data.get("trade_implications", "TBD")}
+                </div>
+            </div>
+
+            <!-- Context / News Check -->
+            <div class="section news">
+                <div class="section-title">
+                    <span class="emoji">🌍</span>
+                    Context / News Check
+                </div>
+                <div>
+                    {forecast_data.get("news_context", "No significant market-moving news detected.")}
+                    <div class="zen-analysis">
+                        {forecast_data.get("zen_analysis", "Zen read → analyzing...")}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="section summary">
+                <div class="section-title">
+                    <span class="emoji">✅</span>
+                    Summary
+                </div>
+                <div>
+                    <strong>Bias:</strong> {forecast_data.get("bias", "Neutral")}. {forecast_data.get("notes", "Monitoring market conditions.")}
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                End of forecast
+            </div>
+        </div>
     </body>
     </html>
     """
@@ -159,13 +346,21 @@ if __name__ == "__main__":
     # - In CI/CD, Stage 4 provides real forecast_data
     # =========================================================
     test_data = {
-        "date": "2025-08-24",
-        "spx": "6411.37",
-        "mes": "6426.75",
-        "vix": "15.78 (+1.35%)",
-        "vvix": "102.09",
-        "bias": "Neutral Bias",
-        "notes": "SPX holding above 6400 floor; RSI mid-range."
+        "date": "2025-09-04",
+        "spx": "6476.86",
+        "mes": "6491.00", 
+        "vix": "15.15",
+        "vvix": "N/A",
+        "bias": "Neutral",
+        "resistance": "6532.23",
+        "support": "6422.23",
+        "base_case": "Chop between 6422.23-6532.23",
+        "bear_case": "If <6422.23, watch 6302.23",
+        "bull_case": "If >6532.23, opens 6672.23",
+        "trade_implications": "Neutral Zone – consider Iron Condor around straddle range",
+        "news_context": "Markets steady ahead of Powell speech",
+        "zen_analysis": "Zen read → noise",
+        "notes": "Watch 6422.23-6532.23 zone and volatility cues"
     }
 
     send_forecast_email(test_data)
