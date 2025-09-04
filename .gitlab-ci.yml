@@ -33,7 +33,7 @@ variables:
 
 # Morning Operations - Schedule at 08:40 ET weekdays
 morning_operations:
-  stage: data_collection
+  stage: ingest
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "MORNING"'
     - if: '$RUN_MORNING_MANUALLY == "1"'
@@ -140,7 +140,7 @@ evening_operations:
 
 # Manual data ingestion job (for testing)
 manual_ingestion:
-  stage: data_collection
+  stage: ingest
   rules:
     - if: '$RUN_INGESTION_ONLY == "1"'
   script:
@@ -186,7 +186,7 @@ zen_council_backtest:
 
 # Automated news infrastructure development
 news_infrastructure_build:
-  stage: data_collection
+  stage: ingest
   rules:
     - if: '$BUILD_NEWS_SYSTEM == "1"'
   script:
@@ -201,7 +201,7 @@ news_infrastructure_build:
 
 # Automated intraday monitoring development
 intraday_monitoring_build:
-  stage: data_collection  
+  stage: ingest  
   rules:
     - if: '$BUILD_INTRADAY_MONITORING == "1"'
   script:
