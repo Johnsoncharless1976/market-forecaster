@@ -22,6 +22,7 @@ This repository has been consolidated into the canonical ZenMarket AI project. A
 **Zen Council**: [http://localhost:8501](http://localhost:8501) (Forecast Intelligence Brain)
 
 ## Recent Activity  
+- **2025-09-04**: Pipeline YAML fixes applied - database email integration working
 - **2025-08-28**: Stage 7 re-scoped to Yahoo-only, external provider deferred
 
 
