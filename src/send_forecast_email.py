@@ -29,7 +29,6 @@ cfg = {
     "SMTP_PORT": os.getenv("SMTP_PORT", "587"),
     "SMTP_USER": os.getenv("SMTP_USER"),
     "SMTP_PASS": os.getenv("SMTP_PASS"),
-    "EMAIL_TO": os.getenv("EMAIL_TO"),
 }
 
 def fetch_forecast(cur):
@@ -40,6 +39,10 @@ def fetch_forecast(cur):
         ORDER BY DATE DESC LIMIT 1
     """)
     return cur.fetchone()
+
+def get_recipients(cur):
+    cur.execute("SELECT EMAIL FROM EMAIL_RECIPIENTS WHERE ACTIVE = TRUE;")
+    return [row[0] for row in cur.fetchall()]
 
 def main():
     # Ensure SMTP creds exist
@@ -53,6 +56,12 @@ def main():
         database=cfg["SNOWFLAKE_DATABASE"], schema=cfg["SNOWFLAKE_SCHEMA"]
     )
     cur = conn.cursor()
+    
+    # Get email recipients from database
+    recipients = get_recipients(cur)
+    if not recipients:
+        print("❌ No active email recipients found"); return
+    
     fc = fetch_forecast(cur)
     if not fc:
         print("❌ No forecast found"); return
@@ -73,12 +82,12 @@ Notes: {notes}
     msg = MIMEText(body)
     msg["Subject"] = f"ZeroDay Zen Forecast – {f_date}"
     msg["From"] = cfg["SMTP_USER"]
-    msg["To"] = cfg["EMAIL_TO"]
+    msg["To"] = ", ".join(recipients)
 
     with smtplib.SMTP(cfg["SMTP_SERVER"], int(cfg["SMTP_PORT"])) as server:
         server.starttls()
         server.login(cfg["SMTP_USER"], cfg["SMTP_PASS"])
-        server.sendmail(cfg["SMTP_USER"], [cfg["EMAIL_TO"]], msg.as_string())
+        server.sendmail(cfg["SMTP_USER"], recipients, msg.as_string())
 
     print("✅ Forecast email sent.")
     cur.close(); conn.close()
