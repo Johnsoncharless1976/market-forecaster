@@ -85,13 +85,18 @@ morning_operations:
         fi
       fi
     
-    - echo "=== LEGACY MORNING EMAIL (FALLBACK) ==="
+    - echo "=== MORNING EMAIL DELIVERY ==="
     - |
-      if [ -f "src/send_am_kneeboard.py" ]; then
-        echo "Note: Zen Council system handles email delivery - this is fallback only"
-        python src/send_am_kneeboard.py || echo "Warning: Legacy email delivery failed"
+      if [ -f "src/format_and_send_forecast.py" ]; then
+        echo "Sending professional morning forecast email"
+        python src/format_and_send_forecast.py
       else
-        echo "Warning: send_am_kneeboard.py not found"
+        echo "Warning: format_and_send_forecast.py not found - using fallback"
+        if [ -f "src/send_am_kneeboard.py" ]; then
+          python src/send_am_kneeboard.py || echo "Warning: Fallback email delivery failed"
+        else
+          echo "Error: No morning email script found"
+        fi
       fi
     
     - echo "=== AUDIT SUMMARY ==="
