@@ -344,6 +344,10 @@ deploy_viz:
       
       echo "✅ Deployment completed"
       echo "📊 Visualization available at: ${DEPLOY_URL}"
+  artifacts:
+    reports:
+      dotenv: deploy.env
+    expire_in: 1 hour
 
 # =========================
 # Stage 6: Smoke Tests (Post-Deploy)
