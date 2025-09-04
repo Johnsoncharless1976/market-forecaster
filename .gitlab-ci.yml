@@ -104,7 +104,7 @@ morning_operations:
 
 # Evening Operations - Schedule at 17:30 ET weekdays
 evening_operations:
-  stage: delivery
+  stage: notify
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $SCHEDULE_TYPE == "EVENING"'
     - if: '$RUN_EVENING_MANUALLY == "1"'
