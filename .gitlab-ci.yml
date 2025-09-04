@@ -149,7 +149,7 @@ manual_ingestion:
 
 # Manual Zen Council forecast execution (for testing)
 manual_zen_council_forecast:
-  stage: forecasting
+  stage: forecast
   rules:
     - if: '$RUN_ZEN_COUNCIL_MANUALLY == "1"'
   script:
@@ -165,7 +165,7 @@ manual_zen_council_forecast:
 
 # Zen Council backtest execution (for parameter optimization)
 zen_council_backtest:
-  stage: forecasting
+  stage: forecast
   rules:
     - if: '$RUN_ZEN_COUNCIL_BACKTEST == "1"'
   script:
