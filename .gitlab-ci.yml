@@ -227,7 +227,6 @@ intraday_monitoring_build:
 # =========================
 send_forecast_email:
   stage: notify
-  needs: ["ci_signature"]
   rules:
     - if: $STAGE_OPEN_NOTIFY == "true" && $CI_COMMIT_REF_NAME == "main"
       when: on_success
@@ -263,7 +262,6 @@ send_forecast_email:
 # =========================
 viz:
   stage: viz
-  needs: ["ci_signature"]  
   rules:
     - if: $STAGE_OPEN_6 == "true"
       when: on_success
